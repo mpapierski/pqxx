@@ -59,13 +59,6 @@ libpqxx ($NEWVERSION-1) unstable; urgency=medium
 EOF
 mv "$TEMPCHANGELOG" "$PARENT"/debian/changelog
 
-# Mark new version in NEWS
-TEMPNEWS="`mktemp`"
-cat - <<EOF "$PARENT/NEWS" >"$TEMPNEWS"
-$NEWVERSION
-EOF
-mv "$TEMPNEWS" "$PARENT"/NEWS
-
 echo "PQXX_VERSION	$NEWVERSION" >"$PARENT"/VERSION
 
 svn commit -m "Forking release $PQXXVERSION, moving on to $NEWVERSION."
