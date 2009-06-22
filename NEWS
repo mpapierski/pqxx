@@ -1,18 +1,7 @@
-3.1
- - Threading behaviour is now documented, and can be queried.
- - Version information available at compile time.
- - Configure with --with-tr1=boost to use BOOST shared_ptr.
- - String conversion now has its own header file.
- - Supports read-only transactions.
- - Fixed breakage with Solaris "make".
- - Uses shared_ptr if available.
- - binarystring::str() is no longer cached; no longer returns reference.
- - Fixed problems in Visual C++ Makefile for test suite.
- - Fixed problems with RPM packaging.
- - Lets you check whether a prepared statement has been defined.
- - "Varargs" prepared statements.
- - Unnamed prepared statements now supported.
- - Results have iterator as well as const_iterator.
+3.0.1
+ - Fixed breakage with Solaris "make."
+ - Fixed various problems in Visual C++ makefile for test suite.
+ - Fixed some problems with RPM packaging.
 3.0
  - Website is now at http://pqxx.org/ (no redirects)
  - Completely replaced cursor classes

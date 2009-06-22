@@ -9,7 +9,6 @@ PACKAGE_VERSION	internal	autotools
 PGSTD	public	compiler
 PQXX_BROKEN_ITERATOR	public	compiler
 PQXX_BROKEN_USING_DECL	public	compiler
-PQXX_HAVE_BOOST_SMART_PTR	public	compiler
 PQXX_HAVE_CHAR_TRAITS	public	compiler
 PQXX_HAVE_COUNT_IF	internal	compiler
 PQXX_HAVE_CPP_PRAGMA_MESSAGE	public	compiler
@@ -36,7 +35,6 @@ PQXX_HAVE_PQPREPARE	internal	libpq
 PQXX_HAVE_PQEXECPREPARED	internal	libpq
 PQXX_HAVE_PQFREEMEM	internal	libpq
 PQXX_HAVE_PQFREENOTIFY	internal	libpq
-PQXX_HAVE_PQISTHREADSAFE	internal	libpq
 PQXX_HAVE_PQSERVERVERSION	internal	libpq
 PQXX_HAVE_PQPROTOCOLVERSION	internal	libpq
 PQXX_HAVE_PQENCRYPTPASSWORD	internal	libpq
@@ -49,7 +47,6 @@ PQXX_HAVE_PQCLIENTENCODING	internal	libpq
 PQXX_HAVE_PQMBLEN	internal	libpq
 PQXX_HAVE_QUIET_NAN	internal	compiler
 PQXX_HAVE_REVERSE_ITERATOR	public	compiler
-PQXX_HAVE_SHARED_PTR	public	compiler
 PQXX_HAVE_SLEEP	internal	compiler
 PQXX_HAVE_STREAMBUF	public	compiler
 PQXX_HAVE_STRERROR_R	internal	compiler
@@ -60,6 +57,4 @@ PQXX_HAVE_SYS_SELECT_H	internal	compiler
 PQXX_SEEKDIRS_MATCH_C	internal	compiler
 PQXX_PQ_IN_NAMESPACE	public	compiler
 PQXX_SELECT_ACCEPTS_NULL	internal	compiler
-PQXX_TR1_HEADERS	public	compiler
-PQXXTR1	public	compiler
 VERSION	internal	autotools

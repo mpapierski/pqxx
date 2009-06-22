@@ -70,13 +70,9 @@ public:
    * those columns will be written, and they will be taken from your input data
    * in that order.
    *
-   * @param T The transaction that this tablewriter will operate on.
-   * @param WName A name for this table writer, to help with debugging.
-   * @param begincolumns Beginning of a sequence of names of columns to write.
-   * @param endcolumns End of a sequence of names of columns to write.
-   * @param Null The string that is used in your input data to denote null.
+   * @param Null the string that is used in your input data to denote null
    */
-  template<typename ITER> tablewriter(transaction_base &T,
+  template<typename ITER> tablewriter(transaction_base &,
       const PGSTD::string &WName,
       ITER begincolumns,
       ITER endcolumns,

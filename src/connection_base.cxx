@@ -7,7 +7,7 @@
  *      implementation of the pqxx::connection_base abstract base class.
  *   pqxx::connection_base encapsulates a frontend to backend connection
  *
- * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -49,12 +49,8 @@
 #include "pqxx/nontransaction"
 #include "pqxx/pipeline"
 #include "pqxx/result"
-#include "pqxx/strconv"
 #include "pqxx/transaction"
 #include "pqxx/notify-listen"
-
-#include "pqxx/internal/result-creation-gate.hxx"
-#include "pqxx/internal/result-connection-gate.hxx"
 
 using namespace PGSTD;
 using namespace pqxx;
@@ -115,7 +111,7 @@ static void clear_fdmask(fd_set *mask)
 string pqxx::encrypt_password(const string &user, const string &password)
 {
   PQAlloc<char> p(PQencryptPassword(password.c_str(), user.c_str()));
-  return string(p.get());
+  return string(p.c_ptr());
 }
 #endif
 
@@ -142,16 +138,6 @@ void pqxx::connection_base::init()
 {
   m_Conn = m_policy.do_startconnect(m_Conn);
   if (m_policy.is_ready(m_Conn)) activate();
-}
-
-
-pqxx::result pqxx::connection_base::make_result(
-	internal::pq::PGresult *rhs,
-	int protocol,
-	const PGSTD::string &query,
-	int encoding)
-{
-  return result_creation_gate::create(rhs, protocol, query, encoding);
 }
 
 
@@ -360,8 +346,8 @@ void pqxx::connection_base::SetupState()
     const int proto = protocol_version();
     const int encoding = encoding_code();
     do
-      r = make_result(PQgetResult(m_Conn), proto, "[RECONNECT]", encoding);
-    while (result_connection_gate(r));
+      r = result(PQgetResult(m_Conn), proto, "[RECONNECT]", encoding);
+    while (r);
   }
 
   m_Completed = true;
@@ -374,11 +360,11 @@ void pqxx::connection_base::check_result(const result &R)
   if (!is_open()) throw broken_connection();
 
   // A shame we can't quite detect out-of-memory to turn this into a bad_alloc!
-  if (!result_connection_gate(R)) throw failure(ErrMsg());
+  if (!R) throw failure(ErrMsg());
 
   try
   {
-    result_creation_gate(R).CheckStatus();
+    R.CheckStatus();
   }
   catch (const exception &e)
   {
@@ -600,11 +586,12 @@ void pqxx::connection_base::add_listener(pqxx::notify_listener *T)
 
     if (is_open()) try
     {
-      check_result(make_result(
-	PQexec(m_Conn, LQ.c_str()),
-	protocol_version(),
-	LQ,
-	encoding_code()));
+      result R( PQexec(m_Conn,
+		LQ.c_str()),
+		protocol_version(),
+		LQ,
+		encoding_code() );
+      check_result(R);
     }
     catch (const broken_connection &)
     {
@@ -713,10 +700,7 @@ int pqxx::connection_base::get_notifs()
   // deliver them.
   if (m_Trans.get()) return notifs;
 
-  typedef PQAlloc<PGnotify> notifptr;
-  for (notifptr N( PQnotifies(m_Conn) );
-       N.get();
-       N = notifptr(PQnotifies(m_Conn)))
+  for (PQAlloc<PGnotify> N( PQnotifies(m_Conn) ); N; N = PQnotifies(m_Conn))
   {
     typedef listenerlist::iterator TI;
 
@@ -750,7 +734,7 @@ int pqxx::connection_base::get_notifs()
       }
     }
 
-    N.reset();
+    N.clear();
   }
   return notifs;
 }
@@ -794,18 +778,14 @@ pqxx::result pqxx::connection_base::Exec(const char Query[], int Retries)
 {
   activate();
 
-  result R = make_result(
-	PQexec(m_Conn, Query),
-	protocol_version(),
-	Query,
-	encoding_code());
+  result R(PQexec(m_Conn, Query), protocol_version(), Query, encoding_code());
 
-  while ((Retries > 0) && !result_connection_gate(R) && !is_open())
+  while ((Retries > 0) && !R && !is_open())
   {
     Retries--;
     Reset();
     if (is_open())
-      R = make_result(PQexec(m_Conn, Query),
+      R = result(PQexec(m_Conn, Query),
 	protocol_version(),
 	Query,
 	encoding_code());
@@ -825,13 +805,12 @@ pqxx::prepare::declaration pqxx::connection_base::prepare(
   PSMap::iterator i = m_prepared.find(name);
   if (i != m_prepared.end())
   {
-    if (name != string() && definition != i->second.definition)
+    if (definition != i->second.definition)
       throw argument_error("Inconsistent redefinition "
 	  "of prepared statement " + name);
 
-    // Prepare for repeated definition of parameters
+    // Prepare for repeated repetition of parameters
     i->second.parameters.clear();
-    i->second.varargs = false;
     i->second.complete = false;
   }
   else
@@ -840,13 +819,6 @@ pqxx::prepare::declaration pqxx::connection_base::prepare(
 	  prepare::internal::prepared_def(definition)));
   }
   return prepare::declaration(*this,name);
-}
-
-
-pqxx::prepare::declaration pqxx::connection_base::prepare(
-	const PGSTD::string &definition)
-{
-  return this->prepare(string(), definition);
 }
 
 
@@ -930,29 +902,9 @@ void pqxx::connection_base::prepare_param_declare(
     throw usage_error("Attempt to add parameter to prepared statement " +
 	statement +
 	" after its definition was completed");
-  if (s.varargs)
-    throw usage_error("Attempt to add parameters to prepared statement " +
-	statement + " after arbitrary trailing parameters.");
   s.addparam(sqltype,treatment);
 }
 
-
-void pqxx::connection_base::prepare_param_declare_varargs(
-	const PGSTD::string &statement,
-	param_treatment treatment)
-{
-  if (!supports(cap_statement_varargs))
-    throw feature_not_supported(
-	"Prepared statements do not support variable argument lists "
-	"in this configuration.");
-  prepare::internal::prepared_def &s = find_prepared(statement);
-  if (s.complete)
-    throw usage_error("Attempt to add arbitrary parameters to prepared "
-	"statement " + statement + " after its definition was completed.");
-  s.varargs_treatment = treatment;
-  s.varargs = true;
-}
- 
 
 pqxx::prepare::internal::prepared_def &
 pqxx::connection_base::register_prepared(const PGSTD::string &name)
@@ -969,8 +921,7 @@ pqxx::connection_base::register_prepared(const PGSTD::string &name)
 #ifdef PQXX_HAVE_PQPREPARE
     if (protocol_version() >= 3)
     {
-      result r = make_result(
-	PQprepare(m_Conn, name.c_str(), s.definition.c_str(), 0, 0),
+      result r(PQprepare(m_Conn, name.c_str(), s.definition.c_str(), 0, 0),
 	protocol_version(),
 	"[PREPARE " + name + "]",
 	encoding_code());
@@ -1013,15 +964,10 @@ pqxx::result pqxx::connection_base::prepared_exec(
 {
   prepare::internal::prepared_def &s = register_prepared(statement);
 
-  const int expected_params = int(s.parameters.size());
-  if (nparams < expected_params)
-    throw usage_error("Insufficient parameters for prepared statement " +
-	statement + ": expected " + to_string(expected_params) + ", "
-	"received " + to_string(nparams));
-
-  if (nparams > expected_params && !s.varargs)
-    throw usage_error("Too many arguments for prepared statement " +
-	statement + ": expected " + to_string(expected_params) + ", "
+  if (nparams != int(s.parameters.size()))
+    throw usage_error("Wrong number of parameters for prepared statement " +
+	statement + ": "
+	"expected " + to_string(s.parameters.size()) + ", "
 	"received " + to_string(nparams));
 
   result r;
@@ -1034,18 +980,16 @@ pqxx::result pqxx::connection_base::prepared_exec(
     if (protocol_version() >= 3)
     {
       internal::scoped_array<int> binary(nparams+1);
-      for (int i=0; i<expected_params; ++i)
+      for (int i=0; i<nparams; ++i)
         binary[i] = (s.parameters[i].treatment == treat_binary);
-      for (int j=expected_params; j < nparams; ++j)
-        binary[j] = (s.varargs_treatment == treat_binary);
       binary[nparams] = 0;
 
-      r = make_result(PQexecPrepared(m_Conn,
+      r = result(PQexecPrepared(m_Conn,
 		statement.c_str(),
 		nparams,
 		params,
 		paramlengths,
-		binary.get(),
+		binary.c_ptr(),
 		0),
 	protocol_version(),
 	statement,
@@ -1066,8 +1010,7 @@ pqxx::result pqxx::connection_base::prepared_exec(
 	Q << escape_param(*this,
 		params[a],
 		paramlengths[a],
-		(a < expected_params) ?
-			s.parameters[a].treatment : s.varargs_treatment);
+		s.parameters[a].treatment);
 	if (a < nparams-1) Q << ',';
       }
       Q << ')';
@@ -1097,13 +1040,6 @@ pqxx::result pqxx::connection_base::prepared_exec(
   }
   get_notifs();
   return r;
-}
-
-
-bool pqxx::connection_base::prepared_exists(const string &statement) const
-{
-  PSMap::const_iterator s = m_prepared.find(statement);
-  return s != PSMap::const_iterator(m_prepared.end());
 }
 
 
@@ -1213,6 +1149,18 @@ void pqxx::connection_base::UnregisterTransaction(transaction_base *T)
 }
 
 
+void pqxx::connection_base::MakeEmpty(pqxx::result &R)
+{
+  if (!m_Conn)
+    throw internal_error("MakeEmpty() on null connection");
+
+  R = result(PQmakeEmptyPGresult(m_Conn, PGRES_EMPTY_QUERY),
+		protocol_version(),
+		"[]",
+		encoding_code());
+}
+
+
 #ifndef PQXX_HAVE_PQPUTCOPY
 namespace
 {
@@ -1232,16 +1180,16 @@ bool pqxx::connection_base::ReadCopyLine(PGSTD::string &Line)
 #ifdef PQXX_HAVE_PQPUTCOPY
   char *Buf = 0;
   const int proto = protocol_version(), encoding=encoding_code();
-  const string query = "[END COPY]";
+  const string querydesc = "[END COPY]";
   switch (PQgetCopyData(m_Conn, &Buf, false))
   {
     case -2:
       throw failure("Reading of table data failed: " + string(ErrMsg()));
 
     case -1:
-      for (result R(make_result(PQgetResult(m_Conn), proto, query, encoding));
-           result_connection_gate(R);
-	   R=make_result(PQgetResult(m_Conn), proto, query, encoding))
+      for (result R(PQgetResult(m_Conn), proto, querydesc, encoding);
+           R;
+	   R=result(PQgetResult(m_Conn), proto, querydesc, encoding))
 	check_result(R);
       Result = false;
       break;
@@ -1343,11 +1291,11 @@ void pqxx::connection_base::EndCopyWrite()
 	"from PQputCopyEnd()");
   }
 
-  check_result(make_result(
-	PQgetResult(m_Conn),
-	protocol_version(),
-	"[END COPY]",
-	encoding_code()));
+  const result R(PQgetResult(m_Conn),
+		protocol_version(),
+		"[END COPY]",
+		encoding_code());
+  check_result(R);
 
 #else
   WriteCopyLine(theWriteTerminator);
@@ -1371,12 +1319,6 @@ pqxx::internal::pq::PGresult *pqxx::connection_base::get_result()
 {
   if (!m_Conn) throw broken_connection();
   return PQgetResult(m_Conn);
-}
-
-
-void pqxx::connection_base::add_reactivation_avoidance_count(int n)
-{
-  m_reactivation_avoidance.add(n);
 }
 
 
@@ -1406,8 +1348,8 @@ string pqxx::connection_base::esc(const char str[], size_t maxlen)
 
 #elif defined(PQXX_HAVE_PQESCAPESTRING)
   scoped_array<char> buf(new char[2*maxlen+1]);
-  const size_t bytes = PQescapeString(buf.get(), str, maxlen);
-  escaped.assign(buf.get(), bytes);
+  const size_t bytes = PQescapeString(buf.c_ptr(), str, maxlen);
+  escaped.assign(buf.c_ptr(), bytes);
 
 #else
   // Last-ditch workaround.  This has serious problems with multibyte encodings.
@@ -1462,7 +1404,7 @@ string pqxx::connection_base::esc_raw(const unsigned char str[], size_t len)
   if (!m_Conn) activate();
 
   PQAlloc<unsigned char> buf( PQescapeByteaConn(m_Conn, str, len, &bytes) );
-  if (!buf.get())
+  if (!buf.c_ptr())
   {
     // TODO: Distinguish different errors in exception type
     throw failure(ErrMsg());
@@ -1470,9 +1412,9 @@ string pqxx::connection_base::esc_raw(const unsigned char str[], size_t len)
 #else
   unsigned char *const s = const_cast<unsigned char *>(str);
   PQAlloc<unsigned char> buf( PQescapeBytea(s, len, &bytes) );
-  if (!buf.get()) throw bad_alloc();
+  if (!buf.c_ptr()) throw bad_alloc();
 #endif
-  return string(reinterpret_cast<char *>(buf.get()));
+  return string(reinterpret_cast<char *>(buf.c_ptr()));
 }
 
 
@@ -1586,23 +1528,24 @@ void pqxx::connection_base::read_capabilities() throw ()
   }
 #endif
 
-  const int
-	v = m_serverversion,
-  	p = protocol_version();
+  const int v = m_serverversion;
 
   m_caps[cap_prepared_statements] = (v >= 70300);
-  m_caps[cap_statement_varargs] = 
-	(v >= 70300 && PQXX_HAVE_PQPREPARE && (p >= 3));
   m_caps[cap_cursor_scroll] = (v >= 70400);
   m_caps[cap_cursor_with_hold] = (v >= 70400);
-  m_caps[cap_cursor_fetch_0] = (v >= 70400);
   m_caps[cap_nested_transactions] = (v >= 80000);
   m_caps[cap_create_table_with_oids] = (v >= 80000);
-  m_caps[cap_read_only_transactions] = (v >= 80000);
 
 #ifdef PQXX_HAVE_PQFTABLECOL
+  const int p = protocol_version();
   m_caps[cap_table_column] = (p >= 3);
 #endif
+}
+
+
+void pqxx::connection_base::set_capability(capability c) throw ()
+{
+  m_caps[c] = true;
 }
 
 

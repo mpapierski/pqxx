@@ -6,7 +6,7 @@
  *   DESCRIPTION
  *      implementation of bytea (binary string) conversions
  *
- * Copyright (c) 2003-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2003-2007, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -16,8 +16,6 @@
  */
 #include "pqxx/compiler-internal.hxx"
 
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <new>
 #include <stdexcept>
@@ -32,54 +30,49 @@ using namespace pqxx::internal;
 
 namespace
 {
-typedef unsigned char unsigned_char;
-
 // Convert textual digit to value
-inline unsigned char DV(unsigned char d)
-{
-  return unsigned_char(digit_to_number(char(d)));
-}
+inline int DV(unsigned char d) { return digit_to_number(char(d)); }
 }
 
 pqxx::binarystring::binarystring(const result::field &F) :
   super(),
-  m_size(0)
+  m_size(0),
+  m_str()
 {
-  const unsigned char *const b(reinterpret_cast<const_iterator>(F.c_str()));
+  unsigned char *p = const_cast<unsigned char *>(
+      reinterpret_cast<const_iterator>(F.c_str()));
 
 #ifdef PQXX_HAVE_PQUNESCAPEBYTEA
-  unsigned char *const p = const_cast<unsigned char *>(b);
 
   size_t sz = 0;
-  super::operator=(super(PQunescapeBytea(p, &sz)));
-  if (!get()) throw bad_alloc();
+  super::operator=(PQunescapeBytea(p, &sz));
+  if (!c_ptr()) throw bad_alloc();
   m_size = sz;
 
 #else
 
-  string s;
-  s.reserve(F.size());
+  m_str.reserve(F.size());
   for (result::field::size_type i=0; i<F.size(); ++i)
   {
-    unsigned char c = b[i];
+    unsigned char c = p[i];
     if (c == '\\')
     {
-      c = b[++i];
-      if (isdigit(c) && isdigit(b[i+1]) && isdigit(b[i+2]))
+      c = p[++i];
+      if (isdigit(c) && isdigit(p[i+1]) && isdigit(p[i+2]))
       {
-	c = unsigned_char((DV(c)<<6) | (DV(b[i+1])<<3) | DV(b[i+2]));
+	c = (DV(c)<<6) | (DV(p[i+1])<<3) | DV(p[i+2]);
 	i += 2;
       }
     }
-    s += char(c);
+    m_str += char(c);
   }
 
-  m_size = s.size();
+  m_size = m_str.size();
   void *buf = malloc(m_size+1);
   if (!buf)
     throw bad_alloc();
-  super::operator=(super(static_cast<unsigned char *>(buf)));
-  memcpy(static_cast<char *>(buf), s.c_str(), m_size);
+  super::operator=(static_cast<unsigned char *>(buf));
+  strcpy(static_cast<char *>(buf), m_str.c_str());
 
 #endif
 }
@@ -108,6 +101,9 @@ pqxx::binarystring::const_reference pqxx::binarystring::at(size_type n) const
 
 void pqxx::binarystring::swap(binarystring &rhs)
 {
+  // This might fail, so do it first
+  m_str.swap(rhs.m_str);
+
   // PQAlloc<>::swap() is nothrow
   super::swap(rhs);
 
@@ -118,9 +114,10 @@ void pqxx::binarystring::swap(binarystring &rhs)
 }
 
 
-string pqxx::binarystring::str() const
+const string &pqxx::binarystring::str() const
 {
-  return string(get(), m_size);
+  if (m_str.empty() && m_size) m_str = string(c_ptr(), m_size);
+  return m_str;
 }
 
 
@@ -130,7 +127,7 @@ string pqxx::escape_binary(const unsigned char bin[], size_t len)
   size_t escapedlen = 0;
   unsigned char *p = const_cast<unsigned char *>(bin);
   PQAlloc<unsigned char> A(PQescapeBytea(p, len, &escapedlen));
-  const char *cstr = reinterpret_cast<const char *>(A.get());
+  const char *cstr = reinterpret_cast<const char *>(A.c_ptr());
   if (!cstr) throw bad_alloc();
   return string(cstr, escapedlen-1);
 #else

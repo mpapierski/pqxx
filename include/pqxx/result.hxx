@@ -8,7 +8,7 @@
  *   pqxx::result represents the set of result tuples from a database query
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/result instead.
  *
- * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -29,7 +29,6 @@
 #include <stdexcept>
 
 #include "pqxx/except"
-#include "pqxx/strconv"
 #include "pqxx/util"
 
 /* Methods tested in eg. self-test program test001 are marked with "//[t1]"
@@ -72,18 +71,9 @@ struct PQXX_PRIVATE result_data
   ~result_data();
 };
 
-void PQXX_LIBEXPORT freemem_result_data(const result_data *) throw ();
+void PQXX_LIBEXPORT freemem_result_data(result_data *) throw ();
 template<> inline
-void PQAlloc<const result_data>::freemem(const result_data *t) throw ()
-	{ freemem_result_data(t); }
-} // namespace internal
-
-
-namespace internal
-{
-class result_connection_gate;
-class result_creation_gate;
-class result_sql_cursor_gate;
+void PQAlloc<result_data>::freemem() throw () { freemem_result_data(m_Obj); }
 } // namespace internal
 
 
@@ -108,10 +98,9 @@ class result_sql_cursor_gate;
  * the same result set--even if it is doing so through a different result
  * object!
  */
-class PQXX_LIBEXPORT result :
-  private internal::PQAlloc<const internal::result_data>
+class PQXX_LIBEXPORT result : private internal::PQAlloc<internal::result_data>
 {
-  typedef internal::PQAlloc<const internal::result_data> super;
+  typedef internal::PQAlloc<internal::result_data> super;
 public:
   class const_iterator;
   class const_fielditerator;
@@ -141,11 +130,9 @@ public:
     typedef unsigned int size_type;
     typedef signed int difference_type;
     typedef const_fielditerator const_iterator;
-    typedef const_iterator iterator;
     typedef field reference;
     typedef const_fielditerator pointer;
     typedef const_reverse_fielditerator const_reverse_iterator;
-    typedef const_reverse_iterator reverse_iterator;
 
     tuple(const result *r, result::size_type i) throw () :
       m_Home(r), m_Index(i) {}
@@ -262,7 +249,7 @@ public:
      *
      * @param ColNum a zero-based column number in this result set
      * @return a zero-based column number in originating table
-     *
+     * 
      * Requires libpq from PostgreSQL 7.4 or better, as well as a server version
      * of at least 7.4.
      */
@@ -537,8 +524,6 @@ public:
 	tuple(r, i) {}
   };
 
-  typedef const_iterator iterator;
-
   class PQXX_LIBEXPORT const_reverse_iterator : private const_iterator
   {
   public:
@@ -620,8 +605,6 @@ public:
 	{ return iterator_type::operator<=(rhs); }
     //@}
   };
-
-  typedef const_reverse_iterator reverse_iterator;
 
   class PQXX_LIBEXPORT const_fielditerator :
     public PGSTD::iterator<PGSTD::random_access_iterator_tag,
@@ -823,7 +806,7 @@ public:
 	{ return tuple(this, i); }
   const tuple at(size_type) const throw (range_error);			//[t10]
 
-  void clear() throw () { super::reset(); m_data = 0; }			//[t20]
+  void clear() throw () { super::clear(); m_data = 0; }			//[t20]
 
   /**
    * @name Column information
@@ -923,23 +906,24 @@ private:
   bool GetIsNull(size_type Row, tuple::size_type Col) const;
   field::size_type GetLength(size_type, tuple::size_type) const;
 
-  friend class pqxx::internal::result_creation_gate;
+  friend class connection_base;
+  friend class pipeline;
   result(internal::pq::PGresult *rhs,
 	int protocol,
 	const PGSTD::string &Query,
 	int encoding_code);
-  void PQXX_PRIVATE CheckStatus() const;
-
-  friend class pqxx::internal::result_connection_gate;
   bool operator!() const throw () { return !m_data; }
   operator bool() const throw () { return m_data != 0; }
+
+  void PQXX_PRIVATE CheckStatus() const;
 
   void PQXX_PRIVATE ThrowSQLError(const PGSTD::string &Err,
 	const PGSTD::string &Query) const;
   int PQXX_PRIVATE errorposition() const throw ();
   PGSTD::string PQXX_PRIVATE StatusError() const;
 
-  friend class pqxx::internal::result_sql_cursor_gate;
+  friend class Cursor;	// deprecated
+  friend class internal::sql_cursor;
   const char *CmdStatus() const throw ();
 
   /// Shortcut: pointer to result data

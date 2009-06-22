@@ -8,7 +8,7 @@
  *   pqxx::connection_base encapsulates a frontend to backend connection
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/connection_base instead.
  *
- * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -27,7 +27,6 @@
 
 #include "pqxx/except"
 #include "pqxx/prepared_statement"
-#include "pqxx/strconv"
 #include "pqxx/util"
 
 
@@ -60,6 +59,12 @@ public:
   void add(int n) throw () { m_counter += n; }
   void clear() throw () { m_counter = 0; }
   int get() const throw () { return m_counter; }
+
+  void give_to(reactivation_avoidance_counter &rhs) throw ()
+  {
+    rhs.add(m_counter);
+    clear();
+  }
 
 private:
   int m_counter;
@@ -120,20 +125,6 @@ struct PQXX_LIBEXPORT nonnoticer : noticer
 PGSTD::string PQXX_LIBEXPORT encrypt_password(				//[t0]
 	const PGSTD::string &user,
 	const PGSTD::string &password);
-
-
-namespace internal
-{
-class connection_dbtransaction_gate;
-class connection_largeobject_gate;
-class connection_notify_listener_gate;
-class connection_pipeline_gate;
-class connection_prepare_declaration_gate;
-class connection_prepare_invocation_gate;
-class connection_sql_cursor_gate;
-class connection_transaction_gate;
-} // namespace pqxx::internal
-
 
 /// connection_base abstract base class; represents a connection to a database.
 /** This is the first class to look at when you wish to work with a database
@@ -388,7 +379,7 @@ public:
     /// Does the backend support prepared statements?  (If not, we emulate them)
     cap_prepared_statements,
 
-    /// Can we specify WITH OIDS with CREATE TABLE?
+    /// Can we specify WITH OIDS with CREATE TABLE?  If we can, we should.
     cap_create_table_with_oids,
 
     /// Can transactions be nested in other transactions?
@@ -400,17 +391,9 @@ public:
     cap_cursor_with_hold,
     /// Can cursors be updateable?
     cap_cursor_update,
-    /// Can cursors fetch zero elements?  (Used to trigger a "fetch all")
-    cap_cursor_fetch_0,
 
     /// Can we ask what table column a result column came from?
     cap_table_column,
-
-    /// Can transactions be READ ONLY?
-    cap_read_only_transactions,
-
-    /// Do prepared statements support varargs?
-    cap_statement_varargs,
 
     /// Not a capability value; end-of-enumeration marker
     cap_end
@@ -562,13 +545,8 @@ public:
    * a statement has been prepared, only closing the connection or explicitly
    * "unpreparing" it can make it go away.
    *
-   * Use the transaction classes' @c prepared().exec() function to execute a
-   * prepared statement.  Use @c prepared().exists() to find out whether a
-   * statement has been prepared under a given name.
-   *
-   * A special case is the nameless prepared statement.  You may prepare a
-   * statement without a name.  The unnamed statement can be redefined at any
-   * time, without un-preparing it first.
+   * Use the transaction classes' exec_prepared() functions to execute a
+   * prepared statement.
    *
    * @warning Prepared statements are not necessarily defined on the backend
    * right away; they may be cached by libpqxx.  This means that statements may
@@ -588,7 +566,7 @@ public:
   /// Define a prepared statement
   /** To declare parameters to this statement, add them by calling the function
    * invocation operator (@c operator()) on the returned object.  See
-   * prepare::param_declaration and prepare::param_treatment for more about how
+   * prepare_param_declaration and prepare::param_treatment for more about how
    * to do this.
    *
    * The statement's definition can refer to a parameter using the parameter's
@@ -630,15 +608,6 @@ public:
    */
   prepare::declaration prepare(const PGSTD::string &name,
 	const PGSTD::string &definition);
-
-  /// Define a nameless prepared statement.
-  /**
-   * This can be useful if you merely want to pass large binary parameters to a
-   * statement without otherwise wishing to prepare it.  If you use this
-   * feature, always keep the definition and the use close together to avoid
-   * the nameless statement being redefined unexpectedly by code somewhere else.
-   */
-  prepare::declaration prepare(const PGSTD::string &definition);
 
   /// Drop prepared statement
   void unprepare(const PGSTD::string &name);
@@ -814,12 +783,6 @@ protected:
   void wait_write() const;
 
 private:
-  static result make_result(
-	internal::pq::PGresult *rhs,
-	int protocol, 
-	const PGSTD::string &query,
-	int encoding_code);
-
   void PQXX_PRIVATE clearcaps() throw ();
   void PQXX_PRIVATE SetupState();
   void PQXX_PRIVATE check_result(const result &);
@@ -835,25 +798,24 @@ private:
 
   void read_capabilities() throw ();
 
+  friend class subtransaction;
+  void set_capability(capability) throw ();
+
   prepare::internal::prepared_def &find_prepared(const PGSTD::string &);
 
-  friend class internal::connection_prepare_declaration_gate;
-  void prepare_param_declare(
-	const PGSTD::string &statement,
-	const PGSTD::string &sqltype,
-	prepare::param_treatment);
-  void prepare_param_declare_varargs(
-	const PGSTD::string &statement,
-	prepare::param_treatment);
+  friend class prepare::declaration;
+  void prepare_param_declare(const PGSTD::string &statement,
+      const PGSTD::string &sqltype,
+      prepare::param_treatment);
 
   prepare::internal::prepared_def &register_prepared(const PGSTD::string &);
-
-  friend class internal::connection_prepare_invocation_gate;
   result prepared_exec(const PGSTD::string &,
 	const char *const[],
 	const int[],
 	int);
-  bool prepared_exists(const PGSTD::string &) const;
+
+  friend class arrayvalue;
+  int PQXX_PRIVATE encoding_code() throw ();
 
   /// Connection handle
   internal::pq::PGconn *m_Conn;
@@ -906,37 +868,36 @@ private:
   /// Unique number to use as suffix for identifiers (see adorn_name())
   int m_unique_id;
 
-  friend class internal::connection_transaction_gate;
+  friend class transaction_base;
   result PQXX_PRIVATE Exec(const char[], int Retries);
+  result pq_exec_prepared(const PGSTD::string &, int, const char *const *);
   void PQXX_PRIVATE RegisterTransaction(transaction_base *);
   void PQXX_PRIVATE UnregisterTransaction(transaction_base *) throw ();
+  void PQXX_PRIVATE MakeEmpty(result &);
   bool PQXX_PRIVATE ReadCopyLine(PGSTD::string &);
   void PQXX_PRIVATE WriteCopyLine(const PGSTD::string &);
   void PQXX_PRIVATE EndCopyWrite();
+  void PQXX_PRIVATE start_exec(const PGSTD::string &);
+  internal::pq::PGresult *get_result();
+
   void PQXX_PRIVATE RawSetVar(const PGSTD::string &, const PGSTD::string &);
   void PQXX_PRIVATE AddVariables(const PGSTD::map<PGSTD::string,
       PGSTD::string> &);
 
-  friend class internal::connection_largeobject_gate;
+  friend class largeobject;
   internal::pq::PGconn *RawConnection() const { return m_Conn; }
 
-  friend class internal::connection_notify_listener_gate;
+  friend class notify_listener;
   void add_listener(notify_listener *);
   void remove_listener(notify_listener *) throw ();
 
-  friend class internal::connection_pipeline_gate;
-  void PQXX_PRIVATE start_exec(const PGSTD::string &);
+  friend class pipeline;
   bool PQXX_PRIVATE consume_input() throw ();
   bool PQXX_PRIVATE is_busy() const throw ();
   void cancel_query();
-  int PQXX_PRIVATE encoding_code() throw ();
-  internal::pq::PGresult *get_result();
 
-  friend class internal::connection_dbtransaction_gate;
-
-  friend class internal::connection_sql_cursor_gate;
-  void add_reactivation_avoidance_count(int);
-
+  friend class internal::sql_cursor;
+  friend class dbtransaction;
   friend class internal::reactivation_avoidance_exemption;
 
   // Not allowed:

@@ -7,7 +7,7 @@
  *      Helper classes for defining and executing prepared statements
  *   See the connection_base hierarchy for more about prepared statements
  *
- * Copyright (c) 2006-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2006-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -21,9 +21,7 @@
 #include "pqxx/compiler-public.hxx"
 #include "pqxx/compiler-internal-pre.hxx"
 
-#include "pqxx/strconv"
 #include "pqxx/util"
-
 
 namespace pqxx
 {
@@ -39,28 +37,20 @@ namespace prepare
  * quoted, escaped, binary-escaped, and/or converted to boolean as it is
  * passed to a prepared statement on execution.
  *
- * This treatment becomes especially relevant when either the available libpq
- * version doesn't provide direct support for prepared statements, so the
- * definition must be generated as SQL.  This is the case with libpq versions
- * prior to the one shipped with PostgreSQL 7.4).
- *
- * To pass binary data into a prepared statement, declare it using treat_binary.
- * When invoking the statement, pass in the binary data as a standard string
- * object.  If your data can contain null bytes, be careful to have those
- * included in the string object: @c std::string("\0 xyz") will construct an
- * empty string because it stops reading data at the nul byte.  You can include
- * the full array of data by passing its length to the string constructor:
- * @c std::string("\0 xyz", 5)
+ * This treatment becomes relevant when either the available libpq version
+ * doesn't provide direct support for prepared statements, so the definition
+ * must be generated as SQL.  This is the case with libpq versions prior to the
+ * one shipped with PostgreSQL 7.4).
  */
 enum param_treatment
 {
-  /// Pass as raw, binary bytes.
+  /// Pass as raw, binary bytes
   treat_binary,
-  /// Escape special characters and add quotes.
+  /// Escape special characters and add quotes
   treat_string,
-  /// Represent as named Boolean value.
+  /// Represent as named Boolean value
   treat_bool,
-  /// Include directly in SQL without conversion (e.g. for numeric types).
+  /// Include directly in SQL without conversion (e.g. for numeric types)
   treat_direct
 };
 
@@ -83,16 +73,6 @@ public:
   const declaration &
   operator()(const PGSTD::string &sqltype, param_treatment=treat_direct) const;
 
-  /// Permit arbitrary parameters after the last declared one.
-  /**
-   * When used, this allows an arbitrary number of parameters to be passed after
-   * the last declared one.  This is similar to the C language's varargs.
-   *
-   * Calling this completes the declaration; no parameters can be declared after
-   * etc().
-   */
-  const declaration &etc(param_treatment=treat_direct) const;
-
 private:
   /// Not allowed
   declaration &operator=(const declaration &);
@@ -110,9 +90,6 @@ public:
 
   /// Execute!
   result exec() const;
-
-  /// Has a statement of this name been defined?
-  bool exists() const;
 
   /// Pass null parameter
   invocation &operator()();
@@ -203,12 +180,6 @@ struct PQXX_LIBEXPORT prepared_def
   bool registered;
   /// Is this definition complete?
   bool complete;
-
-  /// Does this statement accept variable arguments, as declared with etc()?
-  bool varargs;
-
-  /// How should parameters after the last declared one be treated?
-  param_treatment varargs_treatment;
 
   prepared_def();
   explicit prepared_def(const PGSTD::string &);

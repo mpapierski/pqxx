@@ -1,8 +1,8 @@
-libpqxx (3.1-1) unstable; urgency=medium
+libpqxx (3.0.1-1) stable; urgency=medium
 
-  * Forked release 3.0.
+  * New upstream release.
 
- -- Jeroen T. Vermeulen <jtv@xs4all.nl>  Sun, 02 Nov 2008 12:35:55 +0700
+ -- Jeroen T. Vermeulen <jtv@xs4all.nl>  Sun, 21 Jun 2009 21:03:00 +0700
 
 libpqxx (3.0.0-1) stable; urgency=medium
 

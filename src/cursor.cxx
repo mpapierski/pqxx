@@ -7,7 +7,7 @@
  *      implementation of libpqxx STL-style cursor classes.
  *   These classes wrap SQL cursors in STL-like interfaces
  *
- * Copyright (c) 2004-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2004-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -22,15 +22,10 @@
 
 #include "pqxx/cursor"
 #include "pqxx/result"
-#include "pqxx/strconv"
 #include "pqxx/transaction"
-
-#include "pqxx/internal/connection-sql_cursor-gate.hxx"
-#include "pqxx/internal/result-sql_cursor-gate.hxx"
 
 using namespace PGSTD;
 using namespace pqxx;
-using namespace pqxx::internal;
 
 
 namespace
@@ -119,8 +114,7 @@ pqxx::internal::sql_cursor::sql_cursor(transaction_base &t,
   // If we're creating a WITH HOLD cursor, noone is going to destroy it until
   // after this transaction.  That means the connection cannot be deactivated
   // without losing the cursor.
-  if (hold)
-    connection_sql_cursor_gate(t.conn()).add_reactivation_avoidance_count(1);
+  if (hold) t.m_reactivation_avoidance.add(1);
 
   m_ownership = op;
 }
@@ -140,8 +134,7 @@ pqxx::internal::sql_cursor::sql_cursor(transaction_base &t,
   // If we take responsibility for destroying the cursor, that's one less reason
   // not to allow the connection to be deactivated and reactivated.
   // TODO: Go over lifetime/reactivation rules again to be sure they work
-  if (op==cursor_base::owned)
-    connection_sql_cursor_gate(t.conn()).add_reactivation_avoidance_count(-1);
+  if (op==cursor_base::owned) t.m_reactivation_avoidance.add(-1);
   m_adopted = true;
   m_ownership = op;
 }
@@ -153,17 +146,13 @@ void pqxx::internal::sql_cursor::close() throw ()
   {
     try
     {
-      connection_sql_cursor_gate(m_home).Exec(
-	("CLOSE \"" + name() + "\"").c_str(),
-	0);
+      m_home.Exec(("CLOSE \"" + name() + "\"").c_str(), 0);
     }
     catch (const exception &)
     {
     }
 
-    if (m_adopted)
-      connection_sql_cursor_gate(m_home).add_reactivation_avoidance_count(-1);
-
+    if (m_adopted) m_home.m_reactivation_avoidance.add(-1);
     m_ownership = cursor_base::loose;
   }
 }
@@ -174,7 +163,7 @@ void pqxx::internal::sql_cursor::init_empty_result(transaction_base &t)
   if (pos() != 0) throw internal_error("init_empty_result() from bad pos()");
 
   // This doesn't work with older backends, where "FETCH 0" meant "FETCH ALL."
-  if (m_home.supports(connection_base::cap_cursor_fetch_0))
+  if (m_home.server_version() >= 80000)
     m_empty_result = t.exec("FETCH 0 IN \"" + name() + '"');
 }
 
@@ -240,7 +229,7 @@ result pqxx::internal::sql_cursor::fetch(difference_type rows,
     return m_empty_result;
   }
   const string query = "FETCH " + stridestring(rows) + " IN \"" + name() + "\"";
-  const result r(connection_sql_cursor_gate(m_home).Exec(query.c_str(), 0));
+  const result r(m_home.Exec(query.c_str(), 0));
   displacement = adjust(rows, r.size());
   return r;
 }
@@ -257,7 +246,7 @@ cursor_base::difference_type pqxx::internal::sql_cursor::move(
   }
 
   const string query = "MOVE " + stridestring(rows) + " IN \"" + name() + "\"";
-  const result r(connection_sql_cursor_gate(m_home).Exec(query.c_str(), 0));
+  const result r(m_home.Exec(query.c_str(), 0));
 
   // Starting with the libpq in PostgreSQL 7.4, PQcmdTuples() (which we call
   // indirectly here) also returns the number of rows skipped by a MOVE
@@ -269,13 +258,12 @@ cursor_base::difference_type pqxx::internal::sql_cursor::move(
   if (!d)
   {
     static const string StdResponse("MOVE ");
-    const char *const status = result_sql_cursor_gate(r).CmdStatus();
-    if (strncmp(status, StdResponse.c_str(), StdResponse.size()) != 0)
+    if (strncmp(r.CmdStatus(), StdResponse.c_str(), StdResponse.size()) != 0)
       throw internal_error("cursor MOVE returned "
-	  "'" + string(status) + "' "
+	  "'" + string(r.CmdStatus()) + "' "
 	  "(expected '" + StdResponse + "')");
 
-    from_string(status + StdResponse.size(), d);
+    from_string(r.CmdStatus()+StdResponse.size(), d);
   }
 
   displacement = adjust(rows, d);
