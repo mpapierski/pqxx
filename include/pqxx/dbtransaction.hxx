@@ -8,7 +8,7 @@
  *   pqxx::dbransaction defines a real transaction on the database
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/dbtransaction instead.
  *
- * Copyright (c) 2004-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2004-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -26,13 +26,6 @@
 
 namespace pqxx
 {
-
-enum readwrite_policy
-{
-  read_only,
-  read_write
-};
-
 
 /// Abstract base class responsible for bracketing a backend transaction
 /**
@@ -64,32 +57,19 @@ enum readwrite_policy
  * transaction are implemented by a derived class.  The implementing concrete
  * class must also call Begin() and End() from its constructors and destructors,
  * respectively, and implement do_exec().
- *
- * @warning Read-only transactions require backend version 8.0 or better.  On
- * older backends, these transactions will be able to modify the database.
- * Even if you have a newer server version, it is not wise to rely on read-only
- * transactions alone to enforce a security model.
  */
 class PQXX_LIBEXPORT PQXX_NOVTABLE dbtransaction : public transaction_base
 {
-public:
-  virtual ~dbtransaction();
-
 protected:
-  dbtransaction(
-	connection_base &,
-	const PGSTD::string &IsolationString,
-	readwrite_policy rw=read_write);
+  dbtransaction(connection_base &, const PGSTD::string &IsolationString);
+  explicit dbtransaction(connection_base &, bool direct=true);
 
-  explicit dbtransaction(
-	connection_base &,
-	bool direct=true,
-	readwrite_policy rw=read_write);
-
+  virtual ~dbtransaction();
 
   /// Start a transaction on the backend and set desired isolation level
   void start_backend_transaction();
 
+protected:
   /// Sensible default implemented here: begin backend transaction
   virtual void do_begin();						//[t1]
   /// Sensible default implemented here: perform query

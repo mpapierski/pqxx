@@ -8,7 +8,7 @@
  *   C++-style wrappers for SQL cursors
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/pipeline instead.
  *
- * Copyright (c) 2004-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2004-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -351,17 +351,6 @@ private:
 
 class icursor_iterator;
 
-
-namespace internal
-{
-namespace gate
-{
-class icursor_iterator_icursorstream;
-class icursorstream_icursor_iterator;
-} // namespace internal::gate
-} // namespace internal
-
-
 /// Simple read-only cursor represented as a stream of results
 /** SQL cursors can be tricky, especially in C++ since the two languages seem to
  * have been designed on different planets.  An SQL cursor has two singular
@@ -419,12 +408,10 @@ public:
    * defer doing so until after entering the transaction context that will
    * eventually destroy it.
    *
-   * @param context Transaction context that this cursor will be active in.
-   * @param cname Result field containing the name of the SQL cursor to adopt.
+   * @param context Transaction context that this cursor will be active in
+   * @param cname Result field containing the name of the SQL cursor to adopt
    * @param sstride Number of rows to fetch per read operation; must be a
-   * positive number.
-   * @param op Ownership policy.  Determines whether the cursor underlying this
-   * stream will be destroyed when the stream is closed.
+   * positive number
    */
   icursorstream(transaction_base &context,
       const result::field &cname,
@@ -467,7 +454,7 @@ public:
 private:
   result fetchblock();
 
-  friend class internal::gate::icursorstream_icursor_iterator;
+  friend class icursor_iterator;
   size_type forward(size_type n=1);
   void insert_iterator(icursor_iterator *) throw ();
   void remove_iterator(icursor_iterator *) const throw ();
@@ -550,7 +537,7 @@ public:
 private:
   void refresh() const;
 
-  friend class internal::gate::icursor_iterator_icursorstream;
+  friend class icursorstream;
   difference_type pos() const throw () { return m_pos; }
   void fill(const result &);
 

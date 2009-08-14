@@ -7,7 +7,7 @@
  *      implementation of libpqxx STL-style cursor classes.
  *   These classes wrap SQL cursors in STL-like interfaces
  *
- * Copyright (c) 2004-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2004-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -22,17 +22,10 @@
 
 #include "pqxx/cursor"
 #include "pqxx/result"
-#include "pqxx/strconv"
 #include "pqxx/transaction"
-
-#include "pqxx/internal/gates/connection-sql_cursor.hxx"
-#include "pqxx/internal/gates/icursor_iterator-icursorstream.hxx"
-#include "pqxx/internal/gates/icursorstream-icursor_iterator.hxx"
-#include "pqxx/internal/gates/result-sql_cursor.hxx"
 
 using namespace PGSTD;
 using namespace pqxx;
-using namespace pqxx::internal;
 
 
 namespace
@@ -121,8 +114,7 @@ pqxx::internal::sql_cursor::sql_cursor(transaction_base &t,
   // If we're creating a WITH HOLD cursor, noone is going to destroy it until
   // after this transaction.  That means the connection cannot be deactivated
   // without losing the cursor.
-  if (hold)
-    gate::connection_sql_cursor(t.conn()).add_reactivation_avoidance_count(1);
+  if (hold) t.m_reactivation_avoidance.add(1);
 
   m_ownership = op;
 }
@@ -142,8 +134,7 @@ pqxx::internal::sql_cursor::sql_cursor(transaction_base &t,
   // If we take responsibility for destroying the cursor, that's one less reason
   // not to allow the connection to be deactivated and reactivated.
   // TODO: Go over lifetime/reactivation rules again to be sure they work
-  if (op==cursor_base::owned)
-    gate::connection_sql_cursor(t.conn()).add_reactivation_avoidance_count(-1);
+  if (op==cursor_base::owned) t.m_reactivation_avoidance.add(-1);
   m_adopted = true;
   m_ownership = op;
 }
@@ -155,17 +146,13 @@ void pqxx::internal::sql_cursor::close() throw ()
   {
     try
     {
-      gate::connection_sql_cursor(m_home).Exec(
-	("CLOSE \"" + name() + "\"").c_str(),
-	0);
+      m_home.Exec(("CLOSE \"" + name() + "\"").c_str(), 0);
     }
     catch (const exception &)
     {
     }
 
-    if (m_adopted)
-      gate::connection_sql_cursor(m_home).add_reactivation_avoidance_count(-1);
-
+    if (m_adopted) m_home.m_reactivation_avoidance.add(-1);
     m_ownership = cursor_base::loose;
   }
 }
@@ -176,7 +163,7 @@ void pqxx::internal::sql_cursor::init_empty_result(transaction_base &t)
   if (pos() != 0) throw internal_error("init_empty_result() from bad pos()");
 
   // This doesn't work with older backends, where "FETCH 0" meant "FETCH ALL."
-  if (m_home.supports(connection_base::cap_cursor_fetch_0))
+  if (m_home.server_version() >= 80000)
     m_empty_result = t.exec("FETCH 0 IN \"" + name() + '"');
 }
 
@@ -242,7 +229,7 @@ result pqxx::internal::sql_cursor::fetch(difference_type rows,
     return m_empty_result;
   }
   const string query = "FETCH " + stridestring(rows) + " IN \"" + name() + "\"";
-  const result r(gate::connection_sql_cursor(m_home).Exec(query.c_str(), 0));
+  const result r(m_home.Exec(query.c_str(), 0));
   displacement = adjust(rows, r.size());
   return r;
 }
@@ -259,7 +246,7 @@ cursor_base::difference_type pqxx::internal::sql_cursor::move(
   }
 
   const string query = "MOVE " + stridestring(rows) + " IN \"" + name() + "\"";
-  const result r(gate::connection_sql_cursor(m_home).Exec(query.c_str(), 0));
+  const result r(m_home.Exec(query.c_str(), 0));
 
   // Starting with the libpq in PostgreSQL 7.4, PQcmdTuples() (which we call
   // indirectly here) also returns the number of rows skipped by a MOVE
@@ -271,13 +258,12 @@ cursor_base::difference_type pqxx::internal::sql_cursor::move(
   if (!d)
   {
     static const string StdResponse("MOVE ");
-    const char *const status = gate::result_sql_cursor(r).CmdStatus();
-    if (strncmp(status, StdResponse.c_str(), StdResponse.size()) != 0)
+    if (strncmp(r.CmdStatus(), StdResponse.c_str(), StdResponse.size()) != 0)
       throw internal_error("cursor MOVE returned "
-	  "'" + string(status) + "' "
+	  "'" + string(r.CmdStatus()) + "' "
 	  "(expected '" + StdResponse + "')");
 
-    from_string(status + StdResponse.size(), d);
+    from_string(r.CmdStatus()+StdResponse.size(), d);
   }
 
   displacement = adjust(rows, d);
@@ -408,30 +394,26 @@ icursorstream::size_type pqxx::icursorstream::forward(size_type n)
 
 void pqxx::icursorstream::insert_iterator(icursor_iterator *i) throw ()
 {
-  gate::icursor_iterator_icursorstream(*i).set_next(m_iterators);
-  if (m_iterators)
-    gate::icursor_iterator_icursorstream(*m_iterators).set_prev(i);
+  i->m_next = m_iterators;
+  if (m_iterators) m_iterators->m_prev = i;
   m_iterators = i;
 }
 
 
 void pqxx::icursorstream::remove_iterator(icursor_iterator *i) const throw ()
 {
-  gate::icursor_iterator_icursorstream igate(*i);
   if (i == m_iterators)
   {
-    m_iterators = igate.get_next();
-    if (m_iterators)
-      gate::icursor_iterator_icursorstream(*m_iterators).set_prev(0);
+    m_iterators = i->m_next;
+    if (m_iterators) m_iterators->m_prev = 0;
   }
   else
   {
-    icursor_iterator *prev = igate.get_prev(), *next = igate.get_next();
-    gate::icursor_iterator_icursorstream(*prev).set_next(next);
-    if (next) gate::icursor_iterator_icursorstream(*next).set_prev(prev);
+    i->m_prev->m_next = i->m_next;
+    if (i->m_next) i->m_next->m_prev = i->m_prev;
   }
-  igate.set_prev(0);
-  igate.set_next(0);
+  i->m_prev = 0;
+  i->m_next = 0;
 }
 
 
@@ -441,14 +423,9 @@ void pqxx::icursorstream::service_iterators(difference_type topos)
 
   typedef multimap<difference_type,icursor_iterator*> todolist;
   todolist todo;
-  for (icursor_iterator *i = m_iterators, *next; i; i = next)
-  {
-    gate::icursor_iterator_icursorstream gate(*i);
-    const icursor_iterator::difference_type ipos = gate.pos();
-    if (ipos >= m_realpos && ipos <= topos)
-      todo.insert(todolist::value_type(ipos, i));
-    next = gate.get_next();
-  }
+  for (icursor_iterator *i = m_iterators; i; i = i->m_next)
+    if (i->m_pos >= m_realpos && i->m_pos <= topos)
+      todo.insert(todolist::value_type(i->m_pos, i));
   const todolist::const_iterator todo_end(todo.end());
   for (todolist::const_iterator i = todo.begin(); i != todo_end; )
   {
@@ -456,7 +433,7 @@ void pqxx::icursorstream::service_iterators(difference_type topos)
     if (readpos > m_realpos) ignore(readpos - m_realpos);
     const result r = fetchblock();
     for ( ; i != todo_end && i->first == readpos; ++i)
-      gate::icursor_iterator_icursorstream(*i->second).fill(r);
+      i->second->fill(r);
   }
 }
 
@@ -473,11 +450,11 @@ pqxx::icursor_iterator::icursor_iterator() throw () :
 pqxx::icursor_iterator::icursor_iterator(istream_type &s) throw () :
   m_stream(&s),
   m_here(),
-  m_pos(gate::icursorstream_icursor_iterator(s).forward(0)),
+  m_pos(s.forward(0)),
   m_prev(0),
   m_next(0)
 {
-  gate::icursorstream_icursor_iterator(*m_stream).insert_iterator(this);
+  s.insert_iterator(this);
 }
 
 pqxx::icursor_iterator::icursor_iterator(const icursor_iterator &rhs) throw () :
@@ -487,22 +464,20 @@ pqxx::icursor_iterator::icursor_iterator(const icursor_iterator &rhs) throw () :
   m_prev(0),
   m_next(0)
 {
-  if (m_stream) 
-    gate::icursorstream_icursor_iterator(*m_stream).insert_iterator(this);
+  if (m_stream) m_stream->insert_iterator(this);
 }
 
 
 pqxx::icursor_iterator::~icursor_iterator() throw ()
 {
-  if (m_stream)
-    gate::icursorstream_icursor_iterator(*m_stream).remove_iterator(this);
+  if (m_stream) m_stream->remove_iterator(this);
 }
 
 
 icursor_iterator pqxx::icursor_iterator::operator++(int)
 {
   icursor_iterator old(*this);
-  m_pos = gate::icursorstream_icursor_iterator(*m_stream).forward();
+  m_pos = m_stream->forward();
   m_here.clear();
   return old;
 }
@@ -510,7 +485,7 @@ icursor_iterator pqxx::icursor_iterator::operator++(int)
 
 icursor_iterator &pqxx::icursor_iterator::operator++()
 {
-  m_pos = gate::icursorstream_icursor_iterator(*m_stream).forward();
+  m_pos = m_stream->forward();
   m_here.clear();
   return *this;
 }
@@ -523,7 +498,7 @@ icursor_iterator &pqxx::icursor_iterator::operator+=(difference_type n)
     if (!n) return *this;
     throw argument_error("Advancing icursor_iterator by negative offset");
   }
-  m_pos = gate::icursorstream_icursor_iterator(*m_stream).forward(n);
+  m_pos = m_stream->forward(n);
   m_here.clear();
   return *this;
 }
@@ -539,13 +514,11 @@ pqxx::icursor_iterator::operator=(const icursor_iterator &rhs) throw ()
   }
   else
   {
-    if (m_stream)
-      gate::icursorstream_icursor_iterator(*m_stream).remove_iterator(this);
+    if (m_stream) m_stream->remove_iterator(this);
     m_here = rhs.m_here;
     m_pos = rhs.m_pos;
     m_stream = rhs.m_stream;
-    if (m_stream)
-      gate::icursorstream_icursor_iterator(*m_stream).insert_iterator(this);
+    if (m_stream) m_stream->insert_iterator(this);
   }
   return *this;
 }
@@ -572,8 +545,7 @@ bool pqxx::icursor_iterator::operator<(const icursor_iterator &rhs) const
 
 void pqxx::icursor_iterator::refresh() const
 {
-  if (m_stream)
-    gate::icursorstream_icursor_iterator(*m_stream).service_iterators(pos());
+  if (m_stream) m_stream->service_iterators(pos());
 }
 
 
@@ -581,3 +553,4 @@ void pqxx::icursor_iterator::fill(const result &r)
 {
   m_here = r;
 }
+

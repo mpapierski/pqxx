@@ -20,7 +20,6 @@ nobase_include_HEADERS= pqxx/pqxx \
 	pqxx/prepared_statement pqxx/prepared_statement.hxx \
 	pqxx/result pqxx/result.hxx \
 	pqxx/robusttransaction pqxx/robusttransaction.hxx \
-	pqxx/strconv pqxx/strconv.hxx \
 	pqxx/subtransaction pqxx/subtransaction.hxx \
 	pqxx/tablereader pqxx/tablereader.hxx \
 	pqxx/tablestream pqxx/tablestream.hxx \
@@ -30,27 +29,7 @@ nobase_include_HEADERS= pqxx/pqxx \
 	pqxx/transactor pqxx/transactor.hxx \
 	pqxx/trigger pqxx/trigger.hxx \
 	pqxx/util pqxx/util.hxx \
-	pqxx/version pqxx/version.hxx \
-	pqxx/internal/callgate.hxx \
-	pqxx/internal/gates/connection-dbtransaction.hxx \
-	pqxx/internal/gates/connection-largeobject.hxx \
-	pqxx/internal/gates/connection-notify-listener.hxx \
-	pqxx/internal/gates/connection-pipeline.hxx \
-	pqxx/internal/gates/connection-prepare-declaration.hxx \
-	pqxx/internal/gates/connection-prepare-invocation.hxx \
-	pqxx/internal/gates/connection-reactivation_avoidance_exemption.hxx \
-	pqxx/internal/gates/connection-sql_cursor.hxx \
-	pqxx/internal/gates/connection-transaction.hxx \
-	pqxx/internal/gates/icursorstream-icursor_iterator.hxx \
-	pqxx/internal/gates/icursor_iterator-icursorstream.hxx \
-	pqxx/internal/gates/result-connection.hxx \
-	pqxx/internal/gates/result-creation.hxx \
-	pqxx/internal/gates/result-sql_cursor.hxx \
-	pqxx/internal/gates/transaction-subtransaction.hxx \
-	pqxx/internal/gates/transaction-tablereader.hxx \
-	pqxx/internal/gates/transaction-tablewriter.hxx \
-	pqxx/internal/gates/transaction-transactionfocus.hxx
-
+	pqxx/version.hxx
 
 nobase_nodist_include_HEADERS = \
 	pqxx/config-public-compiler.h

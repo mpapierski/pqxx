@@ -22,17 +22,11 @@
 
 #include <cstdio>
 #include <cctype>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
 #include <vector>
-
-#ifdef PQXX_TR1_HEADERS
-#include <tr1/memory>
-#else
-#include <memory>
-#endif
-
 
 /** @mainpage
  * @author Jeroen T. Vermeulen <jtv@xs4all.nl>
@@ -50,200 +44,25 @@
  * The latest information, as well as updates, a mailing list, and a bug
  * reporting system can be found at the project's home page.
  *
- * Some links that should help you find your bearings:
- * \li \ref gettingstarted
- * \li \ref threading
- * \li \ref connection
- * \li \ref transaction
- *
  * @see http://pqxx.org/
- */
-
-/** @page gettingstarted Getting started
- * The most basic three types in libpqxx are the connection (which inherits its
- * API from pqxx::connection_base and its setup behaviour from
- * pqxx::connectionpolicy), the transaction (derived from
- * pqxx::transaction_base), and the result (pqxx::result).
- *
- * They fit together as follows:
- * \li You connect to the database by creating a
- * connection object (see \ref connection).  The connection type you'll usually
- * want is pqxx::connection.
- * \li Within that connection, you create a transaction object (see
- * \ref transaction).  You'll usually want the pqxx::work variety.  If you don't
- * want transactional behaviour, use pqxx::nontransaction.  Once you're done you
- * call the transaction's @c commit function to make its work final.  If you
- * don't call this, the work will be rolled back when the transaction object is
- * destroyed.
- * \li While you have the transaction object, use its @c exec function to
- * execute a query.  The query is a simple string.  The function returns a
- * pqxx::result object, which acts as a standard container of rows.  Each row in
- * itself acts as a container of fields.  You can use array indexing and/or
- * iterators to access either.
- * \li The field's data is stored as a text string.  You can read it as such
- * using its @c c_str() function, or convert it to other types using its @c as()
- * and @c to() functions.  These are templated on the destination type.
- *
- * Here's a very basic example.  It connects to the default database (you'll
- * need to have one set up), asks the database for a very simple result,
- * converts it to an @c int, and prints it.  It also contains some basic error
- * handling.
- *
- * @code
- * #include <iostream>
- * #include <pqxx/pqxx>
- *
- * int main()
- * {
- *   try
- *   {
- *     pqxx::connection c;
- *     pqxx::work w(c);
- *     pqxx::result r = w.exec("SELECT 1");
- *     w.commit();
- *
- *     std::cout << r[0][0].as<int>() << std::endl;
- *   }
- *   catch (const std::exception &e)
- *   {
- *     std::cerr << e.what() << std::endl;
- *     return 1;
- *   }
- * }
- * @endcode
- *
- * This should print the number 1.  Notice that you can keep the result object
- * around after the transaction (or even the connection) has been closed.
- *
- * Here's a slightly more complicated example.  It takes an argument from the
- * command line and retrieves a string with that value.  The interesting part is
- * that it uses the escaping-and-quoting function @c quote() to embed this
- * string value in SQL safely.  It also reads the result field's value as a
- * plain C-style string using its @c c_str() function.
- *
- * @code
- * #include <iostream>
- * #include <pqxx/pqxx>
- *
- * int main(int argc, char *argv[])
- * {
- *   if (!argv[1])
- *   {
- *     std::cerr << "Give me a string!" << std::endl;
- *     return 1;
- *   }
- *   try
- *   {
- *     pqxx::connection c;
- *     pqxx::work w(c);
- *     pqxx::result r = w.exec("SELECT " + w.quote(argv[1]));
- *     w.commit();
- *
- *     std::cout << r[0][0].c_str() << std::endl;
- *   }
- *   catch (const std::exception &e)
- *   {
- *     std::cerr << e.what() << std::endl;
- *     return 1;
- *   }
- * }
- * @endcode
- *
- * You can find more about converting field values to native types, or
- * converting values to strings for use with libpqxx, under
- * \ref stringconversion.  More about getting to the tuples and fields of a
- * result is under \ref accessingresults.
- *
- * If you want to handle exceptions thrown by libpqxx in more detail, for
- * example to print the SQL contents of a query that failed, see \ref exception.
- */
-
-/** @page accessingresults Accessing results and result rows
- *
- * Let's say you have a result object.  For example, your program may have done:
- *
- * @code
- * pqxx::result r = w.exec("SELECT * FROM mytable");
- * @endcode
- *
- * Now how do you access the data inside @c r?
- *
- * The simplest way is array indexing.  A result acts as an array of tuples,
- * and a tuple acts as an array of fields.
- *
- * @code
- * for (int rownum=0; rownum < r.size(); ++rownum)
- * {
- *   const result::tuple row = r[rownum];
- *
- *   for (int colnum=0; colnum < row.size(); ++colnum)
- *   {
- *     const result::field = row[colnum];
- *
- *     std::cout << field.c_str() << '\t';
- *   }
- *
- *   std::cout << std::endl;
- * }
- * @endcode
- *
- * But results and rows also define @c const_iterator types:
- *
- * @code
- * for (pqxx::result::const_iterator row = r.begin();
- *      row != r.end();
- *      ++row)
- *  {
- *    for (pqxx::result::tuple::const_iterator field = row->begin();
- *         field != row->end();
- *         ++field)
- *      std::cout << field->c_str() << '\t';
- *
- *    std::cout << std::endl;
- *  }
- * @endcode
- *
- * They also have @c const_reverse_iterator types, which iterate backwards from
- * @c rbegin() to @c rend() exclusive.
- *
- * All these iterator types provide one extra bit of convenience that you won't
- * normally find in C++ iterators: referential transparency.  You don't need to
- * dereference them to get to the row or field they refer to.  That is, instead
- * of @c row->end() you can also choose to sasy @c row.end().  Similarly, you
- * may prefer @c field.c_str() over @c field->c_str().
- *
- * This becomes really helpful with operators such as the array-indexing
- * operator.  With regular C++ iterators you would need ugly expressions such as
- * @c (*row)[0] or @c row->operator[](0).  With the iterator types defined by
- * the result and tuple classes you can simply say @c row[0].
  */
 
 /** @page threading Thread safety
  *
  * This library does not contain any locking code to protect objects against
- * simultaneous modification in multi-threaded programs.  There are many
- * different threading interfaces and libpqxx does not dictate the choice.
+ * simultaneous modification in multi-threaded programs.  Therefore it is up to
+ * you, the user of the library, to ensure that your client programs perform no
+ * conflicting operations simultaneously in multiple threads.
  *
- * Therefore it is up to you, the user of the library, to ensure that your
- * threaded client programs perform no conflicting operations concurrently.
+ * The reason for this is simple: there are many different threading interfaces
+ * and libpqxx does not mean to impose a choice.  Additionally, locking incurs a
+ * performance overhead without benefitting most programs.
  *
- * The library does try to avoid non-obvious unsafe operations and so does the
- * underlying libpq.  Here's what you should do to keep your threaded libpqxx
- * application safe:
- *
- * \li Treat a connection and all objects related to it as a "world" of its own.
- * With some exceptions (see below), you should make sure that the same "world"
- * is never accessed concurrently by multiple threads.
- *
- * \li Result sets (pqxx::result) and binary data (pqxx::binarystring)
- * are special.  Copying these objects is very cheap, and you can give the copy
- * to another thread.  Just make sure that no other thread accesses the same
- * copy when it's being assigned to, swapped, cleared, or destroyed.
- *
- * @warning Prior to libpqxx 3.1, or in C++ environments without the standard
- * smart pointer type @c "shared_ptr," copying, assigning, or destroying a
- * pqxx::result or pqxx::binarystring could also affect any other other object
- * of the same type referring to the same underlying data.
+ * It's not all bad news, however.  The library tries to avoid unsafe operations
+ * and so does the underlying libpq.  Apart from a few exceptions--which should
+ * generally be noted in this documentation--all your program needs to do to
+ * maintain thread safety is to ensure that no two threads perform a non-const
+ * operation on a single object simultaneously.
  */
 
 /// The home of all libpqxx classes, functions, templates, etc.
@@ -262,63 +81,199 @@ namespace PGSTD {}
 
 namespace pqxx
 {
-/// Descriptor of library's thread-safety model.
-/** This describes what the library knows about various risks to thread-safety.
- */
-struct PQXX_LIBEXPORT thread_safety_model
-{
-  /// Does standard C library offer @c strerror_r?
-  /** If not, its @c strerror implementation may still be thread-safe.  Check
-   * your compiler's manual.
-   *
-   * Without @c strerror_r or a thread-safe @c strerror, the library can't
-   * safely obtain descriptions of certain run-time errors.  In that case, your
-   * application must serialize all use of libpqxx.
-   */
-  bool have_strerror_r;
-
-  /// Is the underlying libpq build thread-safe?
-  /** A @c "false" here may mean one of two things: either the libpq build is
-   * not thread-safe, or it is a thread-safe build of an older version that did
-   * not offer thread-safety information.
-   *
-   * In that case, the best fix is to rebuild libpqxx against (a thread-safe
-   * build of) a newer libpq version.
-   */
-  bool safe_libpq;
-
-  /// Is canceling queries thread-safe?
-  /** If not, avoid use of the pqxx::pipeline class in threaded programs.  Or
-   * better, rebuild libpqxx against a newer libpq version.
-   */
-  bool safe_query_cancel;
-
-  /// Are copies of pqxx::result and pqxx::binarystring objects thread-safe?
-  /** If @c true, it's safe to copy an object of either of these types (copying
-   * these is done very efficiently, so don't worry about data size) and hand
-   * the copy off to another thread.  The other thread may access the copy
-   * freely without any concurrency concerns.
-   */
-  bool safe_result_copy;
-
-  /// Is Kerberos thread-safe?
-  /** @warning Is currently always @c false.
-   *
-   * If your application uses Kerberos, all accesses to libpqxx or Kerberos must
-   * be serialized.  Confine their use to a single thread, or protect it with a
-   * global lock.
-   */
-  bool safe_kerberos;
-
-  /// A human-readable description of any thread-safety issues.
-  PGSTD::string description;
-};
-
-/// Describe thread safety available in this build.
-thread_safety_model describe_thread_safety() throw ();
-
 /// The "null" oid
 const oid oid_none = 0;
+
+/**
+ * @defgroup stringconversion String conversion
+ *
+ * For purposes of communication with the server, values need to be converted
+ * from and to a human-readable string format that (unlike the various functions
+ * and templates in the C and C++ standard libraries) is not sensitive to locale
+ * settings and internationalization.  This section contains functionality that
+ * is used extensively by libpqxx itself, but is also available for use by other
+ * programs.
+ */
+//@{
+
+/// Traits class for use in string conversions
+/** Specialize this template for a type that you wish to add to_string and
+ * from_string support for.
+ */
+template<typename T> struct string_traits;
+
+namespace internal
+{
+/// Throw exception for attempt to convert null to given type.
+void PQXX_LIBEXPORT throw_null_conversion(const PGSTD::string &type);
+} // namespace pqxx::internal
+
+#define PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(T)			\
+template<> struct PQXX_LIBEXPORT string_traits<T>			\
+{									\
+  typedef T subject_type;						\
+  static const char *name() { return #T; }				\
+  static bool has_null() { return false; }				\
+  static bool is_null(T) { return false; }				\
+  static T null() 							\
+    { internal::throw_null_conversion(name()); return subject_type(); }	\
+  static void from_string(const char Str[], T &Obj);			\
+  static PGSTD::string to_string(T Obj);				\
+};
+
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(bool)
+
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(short)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(unsigned short)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(int)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(unsigned int)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(long)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(unsigned long)
+#ifdef PQXX_HAVE_LONG_LONG
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(long long)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(unsigned long long)
+#endif
+
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(float)
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(double)
+#ifdef PQXX_HAVE_LONG_DOUBLE
+PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(long double)
+#endif
+
+#undef PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION
+
+/// String traits for C-style string ("pointer to const char")
+template<> struct PQXX_LIBEXPORT string_traits<const char *>
+{
+  static const char *name() { return "const char *"; }
+  static bool has_null() { return true; }
+  static bool is_null(const char *t) { return !t; }
+  static const char *null() { return NULL; }
+  static void from_string(const char Str[], const char *&Obj) { Obj = Str; }
+  static PGSTD::string to_string(const char *Obj) { return Obj; }
+};
+
+/// String traits for C-style string constant ("array of char")
+template<size_t N> struct PQXX_LIBEXPORT string_traits<char[N]>
+{
+  static const char *name() { return "char[]"; }
+  static bool has_null() { return true; }
+  static bool is_null(const char t[]) { return !t; }
+  static const char *null() { return NULL; }
+  static void from_string(const char Str[], const char *&Obj) { Obj = Str; }
+  static PGSTD::string to_string(const char Obj[]) { return Obj; }
+};
+
+template<> struct PQXX_LIBEXPORT string_traits<PGSTD::string>
+{
+  static const char *name() { return "string"; }
+  static bool has_null() { return false; }
+  static bool is_null(const PGSTD::string &) { return false; }
+  static PGSTD::string null()
+	{ internal::throw_null_conversion(name()); return PGSTD::string(); }
+  static void from_string(const char Str[], PGSTD::string &Obj) { Obj=Str; }
+  static PGSTD::string to_string(const PGSTD::string &Obj) { return Obj; }
+};
+
+template<> struct PQXX_LIBEXPORT string_traits<PGSTD::stringstream>
+{
+  static const char *name() { return "stringstream"; }
+  static bool has_null() { return false; }
+  static bool is_null(const PGSTD::stringstream &) { return false; }
+  static PGSTD::stringstream null()
+  {
+    internal::throw_null_conversion(name());
+    // No, dear compiler, we don't need a return here.
+    throw 0;
+  }
+  static void from_string(const char Str[], PGSTD::stringstream &Obj)
+                                                    { Obj.clear(); Obj << Str; }
+  static PGSTD::string to_string(const PGSTD::stringstream &Obj)
+                                                           { return Obj.str(); }
+};
+
+
+// TODO: Implement date conversions
+
+/// Attempt to convert postgres-generated string to given built-in type
+/** If the form of the value found in the string does not match the expected
+ * type, e.g. if a decimal point is found when converting to an integer type,
+ * the conversion fails.  Overflows (e.g. converting "9999999999" to a 16-bit
+ * C++ type) are also treated as errors.  If in some cases this behaviour should
+ * be inappropriate, convert to something bigger such as @c long @c int first
+ * and then truncate the resulting value.
+ *
+ * Only the simplest possible conversions are supported.  No fancy features
+ * such as hexadecimal or octal, spurious signs, or exponent notation will work.
+ * No whitespace is stripped away.  Only the kinds of strings that come out of
+ * PostgreSQL and out of to_string() can be converted.
+ */
+template<typename T>
+  inline void from_string(const char Str[], T &Obj)
+{
+  if (!Str)
+    throw PGSTD::runtime_error("Attempt to read NULL string");
+  string_traits<T>::from_string(Str, Obj);
+}
+
+
+/// Conversion with known string length (for strings that may contain nuls)
+/** This is only used for strings, where embedded nul bytes should not determine
+ * the end of the string.
+ *
+ * For all other types, this just uses the regular, nul-terminated version of
+ * from_string().
+ */
+template<typename T> void from_string(const char Str[], T &Obj, size_t)
+{
+  return from_string(Str, Obj);
+}
+
+template<>
+  inline void from_string<PGSTD::string>(const char Str[],
+	PGSTD::string &Obj,
+	size_t len)							//[t0]
+{
+  if (!Str)
+    throw PGSTD::runtime_error("Attempt to read NULL string");
+  Obj.assign(Str, len);
+}
+
+template<typename T>
+  inline void from_string(const PGSTD::string &Str, T &Obj)		//[t45]
+	{ from_string(Str.c_str(), Obj); }
+
+template<typename T>
+  inline void from_string(const PGSTD::stringstream &Str, T &Obj)	//[t0]
+	{ from_string(Str.str(), Obj); }
+
+template<> inline void
+from_string(const PGSTD::string &Str, PGSTD::string &Obj)		//[t46]
+	{ Obj = Str; }
+
+
+namespace internal
+{
+/// Compute numeric value of given textual digit (assuming that it is a digit)
+inline int digit_to_number(char c) throw () { return c-'0'; }
+inline char number_to_digit(int i) throw () { return static_cast<char>(i+'0'); }
+}
+
+
+/// Convert built-in type to a readable string that PostgreSQL will understand
+/** No special formatting is done, and any locale settings are ignored.  The
+ * resulting string will be human-readable and in a format suitable for use in
+ * SQL queries.
+ */
+template<typename T> inline PGSTD::string to_string(const T &Obj)
+	{ return string_traits<T>::to_string(Obj); }
+
+
+inline PGSTD::string to_string(const char Obj[])			//[t14]
+	{ return Obj; }
+
+
+//@}
 
 /// Container of items with easy contents initialization and string rendering
 /** Designed as a wrapper around an arbitrary container type, this class lets
@@ -451,34 +406,10 @@ typedef long result_difference_type;
 
 namespace internal
 {
-void PQXX_LIBEXPORT freepqmem(const void *);
-template<typename P> inline void freepqmem_templated(P *p) { freepqmem(p); }
+void PQXX_LIBEXPORT freepqmem(void *);
 
-
-#ifdef PQXX_HAVE_SHARED_PTR
-
-/// Reference-counted smart pointer to libpq-allocated object
-template<typename T, void (*DELETER)(T *) = freepqmem_templated<T> >
-  class PQAlloc : protected PQXXTR1::shared_ptr<T>
-{
-  typedef PQXXTR1::shared_ptr<T> super;
-public:
-  typedef T content_type;
-  PQAlloc() : super() {}
-  explicit PQAlloc(T *t) : super(t, DELETER) {}
-
-  using super::get;
-  using super::operator=;
-  using super::operator->;
-  using super::operator*;
-  using super::reset;
-  using super::swap;
-};
-
-#else // !PQXX_HAVE_SHARED_PTR
 
 /// Helper class used in reference counting (doubly-linked circular list)
-/// Reference-counted smart-pointer for libpq-allocated resources.
 class PQXX_LIBEXPORT refcount
 {
   refcount *volatile m_l, *volatile m_r;
@@ -516,7 +447,7 @@ private:
  * each of these operations is protected against concurrency with similar
  * operations on the same object--or other copies of the same object.
  */
-template<typename T, void (*DELETER)(T *) = freepqmem_templated> class PQAlloc
+template<typename T> class PQAlloc
 {
   T *m_Obj;
   mutable refcount m_rc;
@@ -541,7 +472,7 @@ public:
     rhs = tmp;
   }
 
-  //PQAlloc &operator=(T *obj) throw () { redoref(obj); return *this; }
+  PQAlloc &operator=(T *obj) throw () { redoref(obj); return *this; }
 
   /// Is this pointer non-null?
   operator bool() const throw () { return m_Obj != 0; }
@@ -566,9 +497,9 @@ public:
   /// Obtain underlying pointer
   /** Ownership of the pointer's memory remains with the PQAlloc object
    */
-  T *get() const throw () { return m_Obj; }
+  T *c_ptr() const throw () { return m_Obj; }
 
-  void reset() throw () { loseref(); }
+  void clear() throw () { loseref(); }
 
 private:
   void makeref(T *p) throw () { m_Obj = p; }
@@ -582,7 +513,7 @@ private:
   /// Free and reset current pointer (if any)
   void loseref() throw ()
   {
-    if (m_rc.loseref() && m_Obj) DELETER(m_Obj);
+    if (m_rc.loseref() && m_Obj) freemem();
     m_Obj = 0;
   }
 
@@ -590,9 +521,15 @@ private:
 	{ if (rhs.m_Obj != m_Obj) { loseref(); makeref(rhs); } }
   void redoref(T *obj) throw ()
 	{ if (obj != m_Obj) { loseref(); makeref(obj); } }
+
+  void freemem() throw () { freepqmem(m_Obj); }
 };
 
-#endif // PQXX_HAVE_SHARED_PTR
+
+void PQXX_LIBEXPORT freemem_notif(pq::PGnotify *) throw ();
+template<> inline void PQAlloc<pq::PGnotify>::freemem() throw ()
+	{ freemem_notif(m_Obj); }
+
 
 
 template<typename T> class scoped_array
@@ -607,7 +544,7 @@ public:
   explicit scoped_array(T *t) : m_ptr(t) {}
   ~scoped_array() { delete [] m_ptr; }
 
-  T *get() const throw () { return m_ptr; }
+  T *c_ptr() const throw () { return m_ptr; }
   T &operator*() const throw () { return *m_ptr; }
   template<typename INDEX> T &operator[](INDEX i) const throw ()
 	{ return m_ptr[i]; }

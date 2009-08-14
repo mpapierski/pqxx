@@ -8,7 +8,7 @@
  *   pqxx::transaction_base defines the interface for any abstract class that
  *   represents a database transaction
  *
- * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -26,9 +26,6 @@
 #include "pqxx/tablestream"
 #include "pqxx/transaction_base"
 
-#include "pqxx/internal/gates/connection-transaction.hxx"
-#include "pqxx/internal/gates/transaction-transactionfocus.hxx"
-
 
 using namespace PGSTD;
 using namespace pqxx::internal;
@@ -36,17 +33,16 @@ using namespace pqxx::internal;
 
 pqxx::transaction_base::transaction_base(connection_base &C, bool direct) :
   namedclass("transaction_base"),
-  m_reactivation_avoidance(),
   m_Conn(C),
   m_Focus(),
   m_Status(st_nascent),
   m_Registered(false),
-  m_PendingError()
+  m_PendingError(),
+  m_reactivation_avoidance()
 {
   if (direct)
   {
-    gate::connection_transaction gate(conn());
-    gate.RegisterTransaction(this);
+    m_Conn.RegisterTransaction(this);
     m_Registered = true;
   }
 }
@@ -66,8 +62,7 @@ pqxx::transaction_base::~transaction_base()
     if (m_Registered)
     {
       m_Conn.process_notice(description() + " was never closed properly!\n");
-      gate::connection_transaction gate(conn());
-      gate.UnregisterTransaction(this);
+      m_Conn.UnregisterTransaction(this);
     }
   }
   catch (const exception &e)
@@ -111,17 +106,17 @@ void pqxx::transaction_base::commit()
     return;
 
   case st_in_doubt:
-    // Transaction may or may not have been committed.  The only thing we can
-    // really do is keep telling the caller that the transaction is in doubt.
-    throw in_doubt_error(description() +
-		      " committed again while in an indeterminate state");
+    // Transaction may or may not have been committed.  Report the problem but
+    // don't compound our troubles by throwing.
+    throw usage_error(description() +
+		      "committed again while in an indeterminate state");
 
   default:
     throw internal_error("pqxx::transaction: invalid status code");
   }
 
   // Tricky one.  If stream is nested in transaction but inside the same scope,
-  // the commit() will come before the stream is closed.  Which means the
+  // the Commit() will come before the stream is closed.  Which means the
   // commit is premature.  Punish this swiftly and without fail to discourage
   // the habit from forming.
   if (m_Focus.get())
@@ -153,8 +148,7 @@ void pqxx::transaction_base::commit()
     throw;
   }
 
-  gate::connection_transaction gate(conn());
-  gate.AddVariables(m_Vars);
+  m_Conn.AddVariables(m_Vars);
 
   End();
 }
@@ -271,12 +265,21 @@ pqxx::transaction_base::prepared(const PGSTD::string &statement)
 }
 
 
+pqxx::result pqxx::transaction_base::prepared_exec(
+	const PGSTD::string &statement,
+	const char *const params[],
+	const int paramlengths[],
+	int nparams)
+{
+  return m_Conn.prepared_exec(statement, params, paramlengths, nparams);
+}
+
+
 void pqxx::transaction_base::set_variable(const PGSTD::string &Var,
                                           const PGSTD::string &Value)
 {
   // Before committing to this new value, see what the backend thinks about it
-  gate::connection_transaction gate(conn());
-  gate.RawSetVar(Var, Value);
+  m_Conn.RawSetVar(Var, Value);
   m_Vars[Var] = Value;
 }
 
@@ -285,7 +288,7 @@ string pqxx::transaction_base::get_variable(const PGSTD::string &Var)
 {
   const map<string,string>::const_iterator i = m_Vars.find(Var);
   if (i != m_Vars.end()) return i->second;
-  return gate::connection_transaction(conn()).RawGetVar(Var);
+  return m_Conn.RawGetVar(Var);
 }
 
 
@@ -322,8 +325,7 @@ void pqxx::transaction_base::End() throw ()
     if (m_Registered)
     {
       m_Registered = false;
-      gate::connection_transaction gate(conn());
-      gate.UnregisterTransaction(this);
+      m_Conn.UnregisterTransaction(this);
     }
 
     if (m_Status != st_active) return;
@@ -336,9 +338,7 @@ void pqxx::transaction_base::End() throw ()
     try { abort(); }
     catch (const exception &e) { m_Conn.process_notice(e.what()); }
 
-    gate::connection_transaction gate(conn());
-    gate.take_reactivation_avoidance(m_reactivation_avoidance.get());
-    m_reactivation_avoidance.clear();
+    m_reactivation_avoidance.give_to(conn().m_reactivation_avoidance);
   }
   catch (const exception &e)
   {
@@ -371,7 +371,7 @@ void pqxx::transaction_base::UnregisterFocus(internal::transactionfocus *S)
 pqxx::result pqxx::transaction_base::DirectExec(const char C[], int Retries)
 {
   CheckPendingError();
-  return gate::connection_transaction(conn()).Exec(C, Retries);
+  return m_Conn.Exec(C, Retries);
 }
 
 
@@ -441,38 +441,16 @@ void pqxx::transaction_base::BeginCopyWrite(const PGSTD::string &Table,
 }
 
 
-bool pqxx::transaction_base::ReadCopyLine(PGSTD::string &line)
-{
-  return gate::connection_transaction(conn()).ReadCopyLine(line);
-}
-
-
-void pqxx::transaction_base::WriteCopyLine(const PGSTD::string &line)
-{
-  gate::connection_transaction gate(conn());
-  gate.WriteCopyLine(line);
-}
-
-
-void pqxx::transaction_base::EndCopyWrite()
-{
-  gate::connection_transaction gate(conn());
-  gate.EndCopyWrite();
-}
-
-
 void pqxx::internal::transactionfocus::register_me()
 {
-  gate::transaction_transactionfocus gate(m_Trans);
-  gate.RegisterFocus(this);
+  m_Trans.RegisterFocus(this);
   m_registered = true;
 }
 
 
 void pqxx::internal::transactionfocus::unregister_me() throw ()
 {
-  gate::transaction_transactionfocus gate(m_Trans);
-  gate.UnregisterFocus(this);
+  m_Trans.UnregisterFocus(this);
   m_registered = false;
 }
 
@@ -480,6 +458,7 @@ void
 pqxx::internal::transactionfocus::reg_pending_error(const PGSTD::string &err)
 	throw ()
 {
-  gate::transaction_transactionfocus gate(m_Trans);
-  gate.RegisterPendingError(err);
+  m_Trans.RegisterPendingError(err);
 }
+
+

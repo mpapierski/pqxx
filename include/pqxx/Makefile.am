@@ -8,3 +8,4 @@ nodist_noinst_HEADERS = \
 	config.h \
 	config-internal-compiler.h \
 	config-internal-libpq.h
+

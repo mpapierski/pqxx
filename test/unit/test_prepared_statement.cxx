@@ -3,8 +3,6 @@
 
 #include <pqxx/compiler-internal.hxx>
 
-#include <cassert>
-
 #include "test_helpers.hxx"
 
 using namespace PGSTD;
@@ -92,16 +90,8 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
 
   try
   {
-    PQXX_CHECK(
-	~T.prepared("ReadPGTables").exists(),
-	"Nonexistent prepared statement thinks it exists.");
-
     // Prepare a simple statement
     C.prepare("ReadPGTables", Q_readpgtables);
-
-    PQXX_CHECK(
-	T.prepared("ReadPGTables").exists(),
-	"Prepared statement thinks it doesn't exist.");
 
     // See if a basic prepared statement works just like a regular query
     PQXX_CHECK_EQUAL(
@@ -124,7 +114,7 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
 	T.prepared("ReadPGTables").exec(),
 	T.exec(Q_readpgtables));
 
-  // Drop prepared statement.
+  cout << "Dropping prepared statement..." << endl;
   C.unprepare("ReadPGTables");
 
   PQXX_CHECK_THROWS(
@@ -133,6 +123,7 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
 	"prepare_now() succeeded on dropped statement.");
 
   // Just to try and confuse things, "unprepare" twice
+  cout << "Testing error detection and handling..." << endl;
   try { C.unprepare("ReadPGTables"); }
   catch (const exception &e) { cout << "(Expected) " << e.what() << endl; }
 
@@ -161,7 +152,7 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
 	exception,
 	"Bad redefinition of statement went unnoticed.");
 
-  // Test prepared statement with parameter.
+  cout << "Testing prepared statement with parameter..." << endl;
 
   C.prepare("SeeTable", Q_seetable)("varchar", pqxx::prepare::treat_string);
 
@@ -171,7 +162,7 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
 	T.prepared("SeeTable")(args[0]).exec(),
 	T.exec(subst(T,Q_seetable,args)));
 
-  // Test prepared statement with 2 parameters.
+  cout << "Testing prepared statement with 2 parameters..." << endl;
 
   C.prepare("SeeTables", Q_seetables)
       ("varchar",pqxx::prepare::treat_string)
@@ -181,7 +172,7 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
       T.prepared("SeeTables")(args[0])(args[1]).exec(),
       T.exec(subst(T,Q_seetables,args)));
 
-  // Test prepared statement with a null parameter.
+  cout << "Testing prepared statement with a null parameter..." << endl;
   vector<const char *> ptrs;
   ptrs.push_back(0);
   ptrs.push_back("pg_index");
@@ -201,68 +192,16 @@ void test_prepared_statement(connection_base &C, transaction_base &T)
 	T.prepared("SeeTables")(ptrs[0])(ptrs[1]).exec(),
 	T.prepared("SeeTables")(0,false)(ptrs[1]).exec());
 
-  // Test prepared statement with a binary parameter.
-  C.prepare("GimmeBinary", "SELECT $1::bytea")
-	("bytea", pqxx::prepare::treat_binary);
-
-  const string bin_data("x \0 \x01 \x02 \xff y", 11);
-  assert(bin_data.size() == 11);
-  assert(bin_data[2] == '\0');
-  assert(bin_data[bin_data.size()-1] != '\0');
-
-  PQXX_CHECK_EQUAL(
-	binarystring(T.prepared("GimmeBinary")(bin_data).exec()[0][0]).str(),
-	bin_data,
-	"Binary parameter was mangled somewhere along the way.");
-
-  // Test wrong numbers of parameters.
+  cout << "Testing wrong numbers of parameters..." << endl;
   PQXX_CHECK_THROWS(
 	T.prepared("SeeTables")()()("hi mom!").exec(),
-	usage_error,
+	exception,
 	"No error for too many parameters.");
 
   PQXX_CHECK_THROWS(
 	T.prepared("SeeTables")("who, me?").exec(),
-	usage_error,
+	exception,
 	"No error for too few parameters.");
-
-  // Varargs statements.  These only work if both frontend library and backend
-  // are reasonably up-to-date.
-  if (C.supports(connection_base::cap_statement_varargs))
-  {
-    // Varargs statement called with too few parameters.
-    C.prepare("varargs1", "SELECT 1 * $1")("integer")("integer").etc();
-    PQXX_CHECK_THROWS(
-	  T.prepared("varargs1").exec(),
-	  usage_error,
-	  "No error from too few parameters for varargs statement.");
-
-    // Passing more parameters than expected is okay with varargs.
-    C.prepare("varargs2", "SELECT 1 * $1 * $2 * $3")("integer").etc();
-    result r = T.prepared("varargs2")(1)(2)(3).exec();
-    PQXX_CHECK_EQUAL(
-	  int(r.size()),
-	  1,
-	  "Varargs statement produced strange result.");
-    PQXX_CHECK_EQUAL(
-	r[0][0].as<int>(),
-	6,
-	"Bad answer from varargs statement.");
-  }
-
-  if (C.supports(connection_base::cap_prepare_unnamed_statement))
-  {
-    // Test unnamed prepared statement.
-    C.prepare("SELECT 2*$1")("integer");
-    int outcome = T.prepared()(9).exec()[0][0].as<int>();
-    PQXX_CHECK_EQUAL(outcome, 18, "Unnamed prepared statement went mad.");
-
-    // Redefine unnamed prepared statement.  Does not need to be unprepared
-    // first.
-    C.prepare("SELECT 2*$1 + $2")("integer")("integer");
-    outcome = T.prepared()(9)(2).exec()[0][0].as<int>();
-    PQXX_CHECK_EQUAL(outcome, 20, "Unnamed statement not properly redefined.");
-  }
 }
 } // namespace
 

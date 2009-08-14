@@ -7,7 +7,7 @@
  *      declarations for bytea (binary string) conversions
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/binarystring instead.
  *
- * Copyright (c) 2003-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2003-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -57,7 +57,7 @@ namespace pqxx
  * is protected against concurrency with similar operations on the same object,
  * or other objects pointing to the same data block.
  */
-class PQXX_LIBEXPORT binarystring : internal::PQAlloc<const unsigned char>
+class PQXX_LIBEXPORT binarystring : internal::PQAlloc<unsigned char>
 {
   // TODO: Templatize on character type?
 public:
@@ -103,7 +103,7 @@ public:
 #endif
 
   /// Unescaped field contents
-  const value_type *data() const throw () {return super::get();}	//[t62]
+  const value_type *data() const throw () {return super::c_ptr();}	//[t62]
 
   const_reference operator[](size_type i) const throw ()		//[t62]
 	{ return data()[i]; }
@@ -122,22 +122,24 @@ public:
   /** @warning No terminating zero is added!  If the binary data did not end in
    * a null character, you will not find one here.
    */
-  const char *get() const throw ()					//[t62]
+  const char *c_ptr() const throw ()					//[t62]
   {
-    return reinterpret_cast<const char *>(super::get());
+    return reinterpret_cast<char *>(super::c_ptr());
   }
 
   /// Read as regular C++ string (may include null characters)
-  /** @warning libpqxx releases before 3.1 stored the string and returned a
-   * reference to it.  This is no longer the case!  It now creates and returns
-   * a new string object.  Avoid repeated use of this function; retrieve your
-   * string once and keep it in a local variable.  Also, do not expect to be
-   * able to compare the string's address to that of an earlier invocation.
+  /** Caches string buffer to speed up repeated reads.
+   *
+   * @warning The first invocation of this function on a given binarystring
+   * is not threadsafe; the first invocation constructs the string object and
+   * stores it in the binarystring.  After it has been called once, any
+   * subsequent calls on the same binarystring are safe.
    */
-  PGSTD::string str() const;						//[t62]
+  const PGSTD::string &str() const;					//[t62]
 
 private:
   size_type m_size;
+  mutable PGSTD::string m_str;
 };
 
 

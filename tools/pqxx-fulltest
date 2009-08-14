@@ -55,21 +55,21 @@ pgdir() {
 havepgversions() {
 	mkdir -p "$TESTDIR/pg"
 	pushd "$TESTDIR/pg" >/dev/null
-	SKIP="`find v* -maxdepth 1 -name PQXX_SKIP | sed -e 's|/.*||'`"
+	SKIP="`find v* -name PQXX_SKIP -maxdepth 1 | sed -e 's|/.*||'`"
 	ls -1 | grep -o "$PGVERSIONPAT" | grep -vFx "$SKIP"
 	popd >/dev/null
 }
 
 buildpg() {
 	DEST="$1"
-	./configure --without-readline --prefix="$DEST" && make $MAKEOPT
+	./configure --prefix="$DEST" && make $MAKEOPT
 }
 
 augment_pg_config() {
 	cat <<EOF >>"$1/data/postgresql.conf"
 # Don't bother syncing to disk.
 fsync = false
-#unix_socket_directory = "$1"
+unix_socket_directory = "$1"
 EOF
 }
 
@@ -93,6 +93,7 @@ install_pg() {
 		if buildpg "$DEST" >"$TMPDIR/postgres-build.log" 2>&1 ; then
 			mkdir -p "$DEST"
 			make install >/dev/null
+			augment_pg_config "$DEST"
 		fi
 		popd >/dev/null
 
@@ -161,9 +162,6 @@ startbackend() {
 		export PGDATA
 
 		initdb >/dev/null
-
-		augment_pg_config "$BE"
-
 		# Use postmaster, not postgres; older versions of postgres don't
 		# support -h or -k, and we need both.
 		"$BACKEND_CMD" -F -h '' -k "$BE" >"$BE/backend.log" 2>&1 &
