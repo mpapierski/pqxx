@@ -9,48 +9,44 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template '/home/jtv/proj/libpqxx/trunk/win32/mingw.mak.template'.
+# Generated from template '/home/jtv/proj/libpqxx/branches/3.1/win32/mingw.mak.template'.
 ################################################################################
 # MinGW makefile for libpqxx.  Don't use this; use the configure script instead!
 # Based on original contributed by Pasquale Fersini <basquale.fersini@libero.it>
 
-include win32/common
+include "win32/common"
 
 CXX = g++.exe
 
 OBJ = \
-  src/binarystring.o \
-  src/connection.o \
-  src/connection_base.o \
-  src/cursor.o \
-  src/dbtransaction.o \
-  src/errorhandler.o \
-  src/except.o \
-  src/field.o \
-  src/largeobject.o \
-  src/nontransaction.o \
-  src/notification.o \
-  src/notify-listen.o \
-  src/pipeline.o \
-  src/prepared_statement.o \
-  src/result.o \
-  src/robusttransaction.o \
-  src/statement_parameters.o \
-  src/strconv.o \
-  src/subtransaction.o \
-  src/tablereader.o \
-  src/tablestream.o \
-  src/tablewriter.o \
-  src/transaction.o \
-  src/transaction_base.o \
-  src/tuple.o \
-  src/util.o \
+  "src/binarystring.o" \
+  "src/connection.o" \
+  "src/connection_base.o" \
+  "src/cursor.o" \
+  "src/dbtransaction.o" \
+  "src/except.o" \
+  "src/largeobject.o" \
+  "src/nontransaction.o" \
+  "src/notify-listen.o" \
+  "src/pipeline.o" \
+  "src/prepared_statement.o" \
+  "src/result.o" \
+  "src/robusttransaction.o" \
+  "src/statement_parameters.o" \
+  "src/strconv.o" \
+  "src/subtransaction.o" \
+  "src/tablereader.o" \
+  "src/tablestream.o" \
+  "src/tablewriter.o" \
+  "src/transaction.o" \
+  "src/transaction_base.o" \
+  "src/util.o" \
 
 
-LDFLAGS = -L$(LIBPQPATH) --export-all-symbols --add-stdcall-alias -fpic
-LIBS = -lpq -lm -lws2_32
+LDFLAGS = -L$(LIBPATH1) -L$(LIBPATH2) --export-all-symbols --add-stdcall-alias -fpic
+LIBS = -lpq -lm -lwsock32
 
-CPPFLAGS = -Iinclude -I$(PGSQLINC) -I$(LIBPQINC) \
+CPPFLAGS = -Iinclude -I$(PGSQLSRC)/src/include -I$(PGSQLSRC)/src/interfaces \
   -DBUILDING_DLL -DPQXX_SHARED -DPGSTD=$(STD)
 
 BIN = libpqxx.dll
@@ -84,23 +80,14 @@ src/cursor.o: src/cursor.cxx
 src/dbtransaction.o: src/dbtransaction.cxx
 	$(CXX) $(CPPFLAGS) -c src/dbtransaction.cxx -o src/dbtransaction.o $(CXXFLAGS)
 
-src/errorhandler.o: src/errorhandler.cxx
-	$(CXX) $(CPPFLAGS) -c src/errorhandler.cxx -o src/errorhandler.o $(CXXFLAGS)
-
 src/except.o: src/except.cxx
 	$(CXX) $(CPPFLAGS) -c src/except.cxx -o src/except.o $(CXXFLAGS)
-
-src/field.o: src/field.cxx
-	$(CXX) $(CPPFLAGS) -c src/field.cxx -o src/field.o $(CXXFLAGS)
 
 src/largeobject.o: src/largeobject.cxx
 	$(CXX) $(CPPFLAGS) -c src/largeobject.cxx -o src/largeobject.o $(CXXFLAGS)
 
 src/nontransaction.o: src/nontransaction.cxx
 	$(CXX) $(CPPFLAGS) -c src/nontransaction.cxx -o src/nontransaction.o $(CXXFLAGS)
-
-src/notification.o: src/notification.cxx
-	$(CXX) $(CPPFLAGS) -c src/notification.cxx -o src/notification.o $(CXXFLAGS)
 
 src/notify-listen.o: src/notify-listen.cxx
 	$(CXX) $(CPPFLAGS) -c src/notify-listen.cxx -o src/notify-listen.o $(CXXFLAGS)
@@ -140,9 +127,6 @@ src/transaction.o: src/transaction.cxx
 
 src/transaction_base.o: src/transaction_base.cxx
 	$(CXX) $(CPPFLAGS) -c src/transaction_base.cxx -o src/transaction_base.o $(CXXFLAGS)
-
-src/tuple.o: src/tuple.cxx
-	$(CXX) $(CPPFLAGS) -c src/tuple.cxx -o src/tuple.o $(CXXFLAGS)
 
 src/util.o: src/util.cxx
 	$(CXX) $(CPPFLAGS) -c src/util.cxx -o src/util.o $(CXXFLAGS)

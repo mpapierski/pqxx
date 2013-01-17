@@ -117,9 +117,8 @@ void Test(connection_base &C, bool ExplicitAbort)
 
 void test_abort(transaction_base &t)
 {
-  test::create_pqxxevents(t);
   connection_base &c(t.conn());
-  t.commit();
+  t.abort();
   Test(c, true);
   Test(c, false);
 }

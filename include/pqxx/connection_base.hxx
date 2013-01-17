@@ -8,7 +8,7 @@
  *   pqxx::connection_base encapsulates a frontend to backend connection
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/connection_base instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -23,11 +23,9 @@
 #include "pqxx/compiler-internal-pre.hxx"
 
 #include <bitset>
-#include <list>
 #include <map>
 #include <memory>
 
-#include "pqxx/errorhandler"
 #include "pqxx/except"
 #include "pqxx/prepared_statement"
 #include "pqxx/strconv"
@@ -45,11 +43,10 @@
 
 namespace pqxx
 {
-class binarystring;
-class connectionpolicy;
-class notification_receiver;
 class result;
 class transaction_base;
+class notify_listener;
+class connectionpolicy;
 
 namespace internal
 {
@@ -61,9 +58,9 @@ class reactivation_avoidance_counter
 public:
   reactivation_avoidance_counter() : m_counter(0) {}
 
-  void add(int n) PQXX_NOEXCEPT { m_counter += n; }
-  void clear() PQXX_NOEXCEPT { m_counter = 0; }
-  int get() const PQXX_NOEXCEPT { return m_counter; }
+  void add(int n) throw () { m_counter += n; }
+  void clear() throw () { m_counter = 0; }
+  int get() const throw () { return m_counter; }
 
 private:
   int m_counter;
@@ -71,6 +68,36 @@ private:
 
 }
 
+/**
+ * @addtogroup noticer Error/warning output
+ * @{
+ */
+
+/// Base class for user-definable error/warning message processor
+/** To define a custom method of handling notices, derive a new class from
+ * noticer and override the virtual function
+ * @code operator()(const char[]) throw() @endcode
+ * to process the message passed to it.
+ */
+struct PQXX_LIBEXPORT PQXX_NOVTABLE noticer :
+  PGSTD::unary_function<const char[], void>
+{
+  noticer(){}		// Silences bogus warning in some gcc versions
+  virtual ~noticer() throw () {}
+  virtual void operator()(const char Msg[]) throw () =0;
+};
+
+
+/// No-op message noticer; produces no output
+struct PQXX_LIBEXPORT nonnoticer : noticer
+{
+  nonnoticer(){}	// Silences bogus warning in some gcc versions
+  virtual void operator()(const char []) throw () {}
+};
+
+/**
+ * @}
+ */
 
 /// Encrypt password for given user.  Requires libpq 8.2 or better.
 /** Use this when setting a new password for the user if password encryption is
@@ -101,11 +128,11 @@ namespace internal
 namespace gate
 {
 class connection_dbtransaction;
-class connection_errorhandler;
 class connection_largeobject;
-class connection_notification_receiver;
+class connection_notify_listener;
 class connection_parameterized_invocation;
 class connection_pipeline;
+class connection_prepare_declaration;
 class connection_prepare_invocation;
 class connection_reactivation_avoidance_exemption;
 class connection_sql_cursor;
@@ -152,14 +179,14 @@ class PQXX_LIBEXPORT connection_base
 {
 public:
   /// Explicitly close connection.
-  void disconnect() PQXX_NOEXCEPT;					//[t2]
+  void disconnect() throw ();						//[t2]
 
    /// Is this connection open at the moment?
   /** @warning This function is @b not needed in most code.  Resist the
    * temptation to check it after opening a connection; instead, rely on the
    * broken_connection exception that will be thrown on connection failure.
    */
-  bool PQXX_PURE is_open() const PQXX_NOEXCEPT;				//[t1]
+  bool is_open() const throw ();					//[t1]
 
  /**
    * @name Activation
@@ -252,13 +279,42 @@ public:
   void simulate_failure();						//[t94]
   //@}
 
+  /**
+   * @name Error/warning output
+   *
+   * Whenever the database has a warning or error to report, it will call a
+   * @e noticer to process the associated message.  The default noticer sends
+   * the text of the message to standard error output, but you may choose to
+   * select a different noticer for the connection.
+   */
+  //@{
+
+  /// Set handler for postgresql errors or warning messages.
+  /** The use of auto_ptr implies ownership, so unless the returned value is
+   * copied to another auto_ptr, it will be deleted directly after the call.
+   * This may be important when running under Windows, where a DLL cannot free
+   * memory allocated by the main program.  The auto_ptr will delete the object
+   * from your code context, rather than from inside the library.
+   *
+   * If a noticer exists when the connection_base is destructed, it will also be
+   * deleted.
+   *
+   * @param N New message handler; must not be null or equal to the old one
+   * @return Previous handler
+   */
+  PGSTD::auto_ptr<noticer> set_noticer(PGSTD::auto_ptr<noticer> N)
+    throw ();								//[t14]
+  noticer *get_noticer() const throw () { return m_Noticer.get(); }	//[t14]
+
   /// Invoke notice processor function.  The message should end in newline.
-  void process_notice(const char[]) PQXX_NOEXCEPT;			//[t14]
+  void process_notice(const char[]) throw ();				//[t14]
   /// Invoke notice processor function.  Newline at end is recommended.
-  void process_notice(const PGSTD::string &) PQXX_NOEXCEPT;		//[t14]
+  void process_notice(const PGSTD::string &) throw ();			//[t14]
+
+  //@}
 
   /// Enable tracing to a given output stream, or NULL to disable.
-  void trace(PGSTD::FILE *) PQXX_NOEXCEPT;				//[t3]
+  void trace(FILE *) throw ();						//[t3]
 
   /**
    * @name Connection properties
@@ -302,7 +358,7 @@ public:
    *
    * @return Process identifier, or 0 if not currently connected.
    */
-  int PQXX_PURE backendpid() const PQXX_NOEXCEPT;			//[t1]
+  int backendpid() const throw ();					//[t1]
 
   /// Socket currently used for connection, or -1 for none.  Use with care!
   /** Query the current socket number.  This is intended for event loops based
@@ -319,7 +375,7 @@ public:
    * possibility that there is no socket.  The socket may change or even go away
    * during any invocation of libpqxx code, no matter how trivial.
    */
-  int PQXX_PURE sock() const PQXX_NOEXCEPT;				//[t87]
+  int sock() const throw ();						//[t87]
 
   /** 
    * @name Capabilities
@@ -368,9 +424,6 @@ public:
     /// Can this connection execute parameterized statements?
     cap_parameterized_statements,
 
-    /// Can notifications carry payloads?
-    cap_notify_payload,
-
     /// Not a capability value; end-of-enumeration marker
     cap_end
   };
@@ -393,8 +446,7 @@ public:
    * or the answer will always be "no."  In particular, if you are using this
    * function on a newly-created lazyconnection, activate the connection first.
    */
-  bool supports(capability c) const PQXX_NOEXCEPT			//[t88]
-	{ return m_caps.test(c); }
+  bool supports(capability c) const throw () { return m_caps.test(c); }	//[t88]
 
   /// What version of the PostgreSQL protocol is this connection using?
   /** The answer can be 0 (when there is no connection, or the libpq version
@@ -409,7 +461,7 @@ public:
    *
    * Requires libpq version from PostgreSQL 7.4 or better.
    */
-  int PQXX_PURE protocol_version() const PQXX_NOEXCEPT;			//[t1]
+  int protocol_version() const throw ();				//[t1]
 
   /// What version of the PostgreSQL server are we connected to?
   /** The result is a bit complicated: each of the major, medium, and minor
@@ -424,7 +476,7 @@ public:
    * at all because there is no digit "8" in octal notation.  Use strictly
    * decimal notation when it comes to these version numbers.
    */
-  int PQXX_PURE server_version() const PQXX_NOEXCEPT;			//[t1]
+  int server_version() const throw ();					//[t1]
   //@}
 
   /// Set client-side character encoding
@@ -470,19 +522,19 @@ public:
 
 
   /**
-   * @name Notifications and Receivers
+   * @name Notifications and Listeners
    */
   //@{
   /// Check for pending notifications and take appropriate action.
   /**
    * All notifications found pending at call time are processed by finding
-   * any matching receivers and invoking those.  If no receivers matched the
+   * any matching listeners and invoking those.  If no listeners matched the
    * notification string, none are invoked but the notification is considered
    * processed.
    *
-   * Exceptions thrown by client-registered receivers are reported using the
-   * connection's errorhandlers, but the exceptions themselves are not passed
-   * on outside this function.
+   * Exceptions thrown by client-registered listeners handlers are reported
+   * using the connection's message noticer, but the exceptions themselves are
+   * not passed on outside this function.
    *
    * @return Number of notifications processed
    */
@@ -546,40 +598,50 @@ public:
    */
 
   /// Define a prepared statement
-  /** 
+  /** To declare parameters to this statement, add them by calling the function
+   * invocation operator (@c operator()) on the returned object.  See
+   * prepare::param_declaration and prepare::param_treatment for more about how
+   * to do this.
+   *
    * The statement's definition can refer to a parameter using the parameter's
    * positional number n in the definition.  For example, the first parameter
    * can be used as a variable "$1", the second as "$2" and so on.
    *
-   * Here's an example of how to use prepared statements.  Note the unusual
-   * syntax for passing parameters: every new argument is a parenthesized
-   * expression that is simply tacked onto the end of the statement!
+   * One might use a prepared statement as in the following example.  Note the
+   * unusual syntax associated with parameter definitions and parameter passing:
+   * every new parameter is just a parenthesized expression that is simply
+   * tacked onto the end of the statement!
    *
    * @code
    * using namespace pqxx;
    * void foo(connection_base &C)
    * {
-   *   C.prepare("findtable", "select * from pg_tables where name=$1");
+   *   C.prepare("findtable",
+   *             "select * from pg_tables where name=$1")
+   *             ("varchar", treat_string);
    *   work W(C);
    *   result R = W.prepared("findtable")("mytable").exec();
    *   if (R.empty()) throw runtime_error("mytable not found!");
    * }
    * @endcode
    *
-   * To save time, prepared statements aren't really registered with the backend
-   * until they are first used.  If this is not what you want, e.g. because you
-   * have very specific realtime requirements, you can use the @c prepare_now()
-   * function to force immediate preparation.
+   * For better performance, prepared statements aren't really registered with
+   * the backend until they are first used.  If this is not what you want, e.g.
+   * because you have very specific realtime requirements, you can use the
+   * @c prepare_now() function to force immediate preparation.
    *
    * @warning The statement may not be registered with the backend until it is
-   * actually used.  So if, for example, the statement is syntactically
-   * incorrect, you may see a syntax_error here, or later when you try to call
-   * the statement, or in a prepare_now() call.
+   * actually used.  So if the statement is syntactically incorrect, for
+   * example, a syntax_error may be thrown either from here, or when you try to
+   * call the statement later, or somewhere inbetween if prepare_now() is
+   * called.  This is not guaranteed, and it's still possible to get a
+   * broken_connection or sql_error here, for example.
    *
-   * @param name unique name for the new prepared statement.
-   * @param definition SQL statement to prepare.
+   * @param name unique identifier to associate with new prepared statement
+   * @param definition SQL statement to prepare
    */
-  void prepare(const PGSTD::string &name, const PGSTD::string &definition);
+  prepare::declaration prepare(const PGSTD::string &name,
+	const PGSTD::string &definition);
 
   /// Define a nameless prepared statement.
   /**
@@ -588,7 +650,7 @@ public:
    * feature, always keep the definition and the use close together to avoid
    * the nameless statement being redefined unexpectedly by code somewhere else.
    */
-  void prepare(const PGSTD::string &definition);
+  prepare::declaration prepare(const PGSTD::string &definition);
 
   /// Drop prepared statement
   void unprepare(const PGSTD::string &name);
@@ -744,12 +806,6 @@ public:
   /// Escape binary string for use as SQL string literal on this connection
   PGSTD::string esc_raw(const unsigned char str[], size_t len);
 
-  /// Escape and quote a string of binary data.
-  PGSTD::string quote_raw(const unsigned char str[], size_t len);
-
-  /// Escape and quote an SQL identifier for use in a query.
-  PGSTD::string quote_name(const PGSTD::string &identifier);
-
   /// Represent object as SQL string, including quoting & escaping.
   /** Nulls are recognized and represented as SQL nulls. */
   template<typename T>
@@ -758,78 +814,48 @@ public:
     if (string_traits<T>::is_null(t)) return "NULL";
     return "'" + this->esc(to_string(t)) + "'";
   }
-
-  PGSTD::string quote(const binarystring &);
   //@}
 
   /// Attempt to cancel the ongoing query, if any.
   void cancel_query();
 
-  /// Error verbosity levels.
-  enum error_verbosity
-  {
-      // These values must match those in libpq's PGVerbosity enum.
-      terse=0,
-      normal=1,
-      verbose=2
-  };
-
-  /// Set session verbosity.
-  /** Set the verbosity of error messages to "terse", "normal" (i.e. default) or
-   * "verbose."
-   *
-   *  If "terse", returned messages include severity, primary text, and position
-   *  only; this will normally fit on a single line. "normal" produces messages
-   *  that include the above plus any detail, hint, or context fields (these
-   *  might span multiple lines).  "verbose" includes all available fields.
-   */
-  void set_verbosity(error_verbosity verbosity) PQXX_NOEXCEPT;
-   /// Retrieve current error verbosity
-  error_verbosity get_verbosity() const PQXX_NOEXCEPT {return m_verbosity;}
-
-  /// Return pointers to the active errorhandlers.
-  /** The entries are ordered from oldest to newest handler.
-   *
-   * You may use this to find errorhandlers that your application wants to
-   * delete when destroying the connection.  Be aware, however, that libpqxx
-   * may also add errorhandlers of its own, and those will be included in the
-   * list.  If this is a problem for you, derive your errorhandlers from a
-   * custom base class derived from pqxx::errorhandler.  Then use dynamic_cast
-   * to find which of the error handlers are yours.
-   *
-   * The pointers point to the real errorhandlers.  The container it returns
-   * however is a copy of the one internal to the connection, not a reference.
-   */
-  PGSTD::vector<errorhandler *> get_errorhandlers() const;
-
 protected:
   explicit connection_base(connectionpolicy &);
   void init();
 
-  void close() PQXX_NOEXCEPT;
+  void close() throw ();
   void wait_read() const;
   void wait_read(long seconds, long microseconds) const;
   void wait_write() const;
 
 private:
-
   result make_result(internal::pq::PGresult *rhs, const PGSTD::string &query);
 
-  void PQXX_PRIVATE clearcaps() PQXX_NOEXCEPT;
+  void PQXX_PRIVATE clearcaps() throw ();
   void PQXX_PRIVATE SetupState();
   void PQXX_PRIVATE check_result(const result &);
 
-  void PQXX_PRIVATE InternalSetTrace() PQXX_NOEXCEPT;
-  int PQXX_PRIVATE PQXX_PURE Status() const PQXX_NOEXCEPT;
-  const char * PQXX_PURE ErrMsg() const PQXX_NOEXCEPT;
+  void PQXX_PRIVATE InternalSetTrace() throw ();
+  int PQXX_PRIVATE Status() const throw ();
+  const char *ErrMsg() const throw ();
   void PQXX_PRIVATE Reset();
   void PQXX_PRIVATE RestoreVars();
   PGSTD::string PQXX_PRIVATE RawGetVar(const PGSTD::string &);
-  void PQXX_PRIVATE process_notice_raw(const char msg[]) PQXX_NOEXCEPT;
+  void PQXX_PRIVATE process_notice_raw(const char msg[]) throw ();
+  void switchnoticer(const PGSTD::auto_ptr<noticer> &) throw ();
 
-  void read_capabilities() PQXX_NOEXCEPT;
+  void read_capabilities() throw ();
 
   prepare::internal::prepared_def &find_prepared(const PGSTD::string &);
+
+  friend class internal::gate::connection_prepare_declaration;
+  void prepare_param_declare(
+	const PGSTD::string &statement,
+	const PGSTD::string &sqltype,
+	prepare::param_treatment);
+  void prepare_param_declare_varargs(
+	const PGSTD::string &statement,
+	prepare::param_treatment);
 
   prepare::internal::prepared_def &register_prepared(const PGSTD::string &);
 
@@ -837,27 +863,33 @@ private:
   result prepared_exec(const PGSTD::string &,
 	const char *const[],
 	const int[],
-	const int[],
 	int);
   bool prepared_exists(const PGSTD::string &) const;
 
-  /// Connection handle.
+  /// Connection handle
   internal::pq::PGconn *m_Conn;
 
   connectionpolicy &m_policy;
 
-  /// Active transaction on connection, if any.
+  /// Active transaction on connection, if any
   internal::unique<transaction_base> m_Trans;
 
-  PGSTD::list<errorhandler *> m_errorhandlers;
+  /// User-defined notice processor, if any
+  PGSTD::auto_ptr<noticer> m_Noticer;
+
+  /// Default notice processor
+  /** We must restore the notice processor to this default after removing our
+   * own noticers.  Failure to do so caused test005 to crash on some systems.
+   * Kudos to Bart Samwel for tracking this down and submitting the fix!
+   */
+  internal::pq::PQnoticeProcessor m_defaultNoticeProcessor;
 
   /// File to trace to, if any
-  PGSTD::FILE *m_Trace;
+  FILE *m_Trace;
 
-  typedef PGSTD::multimap<PGSTD::string, pqxx::notification_receiver *>
-	receiver_list;
-  /// Notification receivers.
-  receiver_list m_receivers;
+  typedef PGSTD::multimap<PGSTD::string, pqxx::notify_listener *> listenerlist;
+  /// Notifications this session is listening on
+  listenerlist m_listeners;
 
   /// Variables set in this session
   PGSTD::map<PGSTD::string, PGSTD::string> m_Vars;
@@ -885,17 +917,10 @@ private:
   /// Set of session capabilities
   PGSTD::bitset<cap_end> m_caps;
 
-  /// Current verbosity level
-  error_verbosity m_verbosity;
-
-  friend class internal::gate::connection_errorhandler;
-  void PQXX_PRIVATE register_errorhandler(errorhandler *);
-  void PQXX_PRIVATE unregister_errorhandler(errorhandler *) PQXX_NOEXCEPT;
-
   friend class internal::gate::connection_transaction;
   result PQXX_PRIVATE Exec(const char[], int Retries);
   void PQXX_PRIVATE RegisterTransaction(transaction_base *);
-  void PQXX_PRIVATE UnregisterTransaction(transaction_base *) PQXX_NOEXCEPT;
+  void PQXX_PRIVATE UnregisterTransaction(transaction_base *) throw ();
   bool PQXX_PRIVATE ReadCopyLine(PGSTD::string &);
   void PQXX_PRIVATE WriteCopyLine(const PGSTD::string &);
   void PQXX_PRIVATE EndCopyWrite();
@@ -906,15 +931,15 @@ private:
   friend class internal::gate::connection_largeobject;
   internal::pq::PGconn *RawConnection() const { return m_Conn; }
 
-  friend class internal::gate::connection_notification_receiver;
-  void add_receiver(notification_receiver *);
-  void remove_receiver(notification_receiver *) PQXX_NOEXCEPT;
+  friend class internal::gate::connection_notify_listener;
+  void add_listener(notify_listener *);
+  void remove_listener(notify_listener *) throw ();
 
   friend class internal::gate::connection_pipeline;
   void PQXX_PRIVATE start_exec(const PGSTD::string &);
-  bool PQXX_PRIVATE consume_input() PQXX_NOEXCEPT;
-  bool PQXX_PRIVATE is_busy() const PQXX_NOEXCEPT;
-  int PQXX_PRIVATE encoding_code();
+  bool PQXX_PRIVATE consume_input() throw ();
+  bool PQXX_PRIVATE is_busy() const throw ();
+  int PQXX_PRIVATE encoding_code() throw ();
   internal::pq::PGresult *get_result();
 
   friend class internal::gate::connection_dbtransaction;
@@ -929,7 +954,6 @@ private:
 	const PGSTD::string &query,
 	const char *const params[],
 	const int paramlengths[],
-	const int binaries[],
 	int nparams);
 
   // Not allowed:
@@ -939,44 +963,59 @@ private:
 
 
 
-#ifdef PQXX_HAVE_AUTO_PTR
-/// @deprecated Create an @c errorhandler instead.
-struct PQXX_LIBEXPORT PQXX_NOVTABLE noticer :
-  PGSTD::unary_function<const char[], void>
-{
-  virtual ~noticer() PQXX_NOEXCEPT {}
-  virtual void operator()(const char[]) PQXX_NOEXCEPT =0;
-};
-/// @deprecated Use @c quiet_errorhandler instead.
-struct PQXX_LIBEXPORT nonnoticer : noticer
-{
-  virtual void operator()(const char[]) PQXX_NOEXCEPT {}
-};
-/// @deprecated Create an @c errorhandler instead.
-class PQXX_LIBEXPORT scoped_noticer : errorhandler
+/// Temporarily set different noticer for connection, then restore old one
+/** Set different noticer in given connection for the duration of the
+ * scoped_noticer's lifetime.  After that, the original noticer is restored.
+ *
+ * No effort is made to respect any new noticer that may have been set in the
+ * meantime, so don't do that.
+ */
+class PQXX_LIBEXPORT scoped_noticer
 {
 public:
-  scoped_noticer(connection_base &c, PGSTD::auto_ptr<noticer> t) PQXX_NOEXCEPT :
-    errorhandler(c), m_noticer(t.release()) {}
+  /// Start period where different noticer applies to connection
+  /**
+   * @param c connection object whose noticer should be temporarily changed
+   * @param t temporary noticer object to use; will be destroyed on completion
+   */
+  scoped_noticer(connection_base &c, PGSTD::auto_ptr<noticer> t) throw () :
+    m_c(c), m_org(c.set_noticer(t)) { }
+
+  ~scoped_noticer() { m_c.set_noticer(m_org); }
+
 protected:
-  scoped_noticer(connection_base &c, noticer *t) PQXX_NOEXCEPT :
-    errorhandler(c), m_noticer(t) {}
-  virtual bool operator()(const char msg[]) PQXX_NOEXCEPT
+  /// Take ownership of given noticer, and start using it
+  /** This constructor is not public because its interface does not express the
+   * fact that the scoped_noticer takes ownership of the noticer through an
+   * @c auto_ptr.
+   */
+  scoped_noticer(connection_base &c, noticer *t) throw () :
+    m_c(c),
+    m_org()
   {
-    (*m_noticer)(msg);
-    return false;
+    PGSTD::auto_ptr<noticer> x(t);
+    PGSTD::auto_ptr<noticer> y(c.set_noticer(x));
+    m_org = y;
   }
+
 private:
-  PGSTD::auto_ptr<noticer> m_noticer;
+  connection_base &m_c;
+  PGSTD::auto_ptr<noticer> m_org;
+
+  /// Not allowed
+  scoped_noticer();
+  scoped_noticer(const scoped_noticer &);
+  scoped_noticer operator=(const scoped_noticer &);
 };
-/// @deprecated Create a @c quiet_errorhandler instead.
+
+
+/// Temporarily disable the notice processor
 class PQXX_LIBEXPORT disable_noticer : scoped_noticer
 {
 public:
   explicit disable_noticer(connection_base &c) :
     scoped_noticer(c, new nonnoticer) {}
 };
-#endif
 
 
 namespace internal
@@ -989,7 +1028,7 @@ public:
   explicit reactivation_avoidance_exemption(connection_base &C);
   ~reactivation_avoidance_exemption();
 
-  void close_connection() PQXX_NOEXCEPT { m_open = false; }
+  void close_connection() throw () { m_open = false; }
 
 private:
   connection_base &m_home;
@@ -1009,3 +1048,4 @@ void wait_write(const internal::pq::PGconn *);
 #include "pqxx/compiler-internal-post.hxx"
 
 #endif
+

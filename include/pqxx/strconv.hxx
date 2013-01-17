@@ -7,7 +7,7 @@
  *      String conversion definitions for libpqxx
  *      DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/stringconv instead.
  *
- * Copyright (c) 2008-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2008-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -48,8 +48,7 @@ template<typename T> struct string_traits {};
 namespace internal
 {
 /// Throw exception for attempt to convert null to given type.
-void PQXX_LIBEXPORT PQXX_NORETURN throw_null_conversion(
-	const PGSTD::string &type);
+void PQXX_LIBEXPORT throw_null_conversion(const PGSTD::string &type);
 } // namespace pqxx::internal
 
 #define PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(T)			\
@@ -118,22 +117,9 @@ template<size_t N> struct PQXX_LIBEXPORT string_traits<char[N]>
   static bool has_null() { return true; }
   static bool is_null(const char t[]) { return !t; }
   static const char *null() { return NULL; }
+  static void from_string(const char Str[], const char *&Obj) { Obj = Str; }
   static PGSTD::string to_string(const char Obj[]) { return Obj; }
 };
-
-/// String traits for "array of const char."
-/** Visual Studio 2010 isn't happy without this redundant specialization.
- * Other compilers shouldn't need it.
- */
-template<size_t N> struct PQXX_LIBEXPORT string_traits<const char[N]>
-{
-  static const char *name() { return "char[]"; }
-  static bool has_null() { return true; }
-  static bool is_null(const char t[]) { return !t; }
-  static const char *null() { return NULL; }
-  static PGSTD::string to_string(const char Obj[]) { return Obj; }
-};
-
 
 template<> struct PQXX_LIBEXPORT string_traits<PGSTD::string>
 {
@@ -236,9 +222,8 @@ from_string(const PGSTD::string &Str, PGSTD::string &Obj)		//[t46]
 namespace internal
 {
 /// Compute numeric value of given textual digit (assuming that it is a digit)
-inline int digit_to_number(char c) PQXX_NOEXCEPT { return c-'0'; }
-inline char number_to_digit(int i) PQXX_NOEXCEPT
-	{ return static_cast<char>(i+'0'); }
+inline int digit_to_number(char c) throw () { return c-'0'; }
+inline char number_to_digit(int i) throw () { return static_cast<char>(i+'0'); }
 } // namespace pqxx::internal
 
 
@@ -249,6 +234,10 @@ inline char number_to_digit(int i) PQXX_NOEXCEPT
  */
 template<typename T> inline PGSTD::string to_string(const T &Obj)
 	{ return string_traits<T>::to_string(Obj); }
+
+
+inline PGSTD::string to_string(const char Obj[])			//[t14]
+	{ return Obj; }
 
 //@}
 

@@ -35,33 +35,32 @@ void test_093(transaction_base &T)
     // T and connection are closed here; result objects remain
   }
 
-  pqxx::tuple::size_type
-	x = R.table_column(2),
-	y = R.table_column(1),
-	z = R.table_column(int(0));
+#ifdef PQXX_HAVE_PQFTABLECOL
+  int x = R.table_column(2),
+      y = R.table_column(1),
+      z = R.table_column(int(0));
 
-  PQXX_CHECK_EQUAL(x, 0u, "Wrong column number.");
-  PQXX_CHECK_EQUAL(y, 1u, "Wrong column number.");
-  PQXX_CHECK_EQUAL(z, 2u, "Wrong column number.");
+  PQXX_CHECK_EQUAL(x, 0, "Wrong column number.");
+  PQXX_CHECK_EQUAL(y, 1, "Wrong column number.");
+  PQXX_CHECK_EQUAL(z, 2, "Wrong column number.");
 
   x = R.table_column("x");
   y = R.table_column("y");
   z = R.table_column("z");
 
-  PQXX_CHECK_EQUAL(x, 0u, "Wrong number for named column.");
-  PQXX_CHECK_EQUAL(y, 1u, "Wrong number for named column.");
-  PQXX_CHECK_EQUAL(z, 2u, "Wrong number for named column.");
+  PQXX_CHECK_EQUAL(x, 0, "Wrong number for named column.");
+  PQXX_CHECK_EQUAL(y, 1, "Wrong number for named column.");
+  PQXX_CHECK_EQUAL(z, 2, "Wrong number for named column.");
 
-  pqxx::tuple::size_type
-	xx = X[0].table_column(int(0)),
-	yx = X[0].table_column(pqxx::tuple::size_type(1)),
-	zx = X[0].table_column("z");
+  int xx = X[0].table_column(int(0)),
+      yx = X[0].table_column(result::tuple::size_type(1)),
+      zx = X[0].table_column("z");
 
-  PQXX_CHECK_EQUAL(xx, 0u, "Bad result from table_column(int).");
-  PQXX_CHECK_EQUAL(yx, 1u, "Bad result from table_column(size_type).");
-  PQXX_CHECK_EQUAL(zx, 2u, "Bad result from table_column(string).");
+  PQXX_CHECK_EQUAL(xx, 0, "Bad result from table_column(int).");
+  PQXX_CHECK_EQUAL(yx, 1, "Bad result from table_column(size_type).");
+  PQXX_CHECK_EQUAL(zx, 2, "Bad result from table_column(string).");
 
-  for (pqxx::tuple::size_type i=0; i<R[0].size(); ++i)
+  for (result::tuple::size_type i=0; i<R[0].size(); ++i)
     PQXX_CHECK_EQUAL(
 	R[0][i].table_column(),
 	R.table_column(i),
@@ -81,6 +80,7 @@ void test_093(transaction_base &T)
 	X.table_column(3),
 	exception,
 	"table_column() on non-table didn't fail.");
+#endif	// PQXX_HAVE_PQFTABLECOL
 }
 } // namespace
 

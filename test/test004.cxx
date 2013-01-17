@@ -15,40 +15,40 @@ namespace
 int Backend_PID = 0;
 
 
-// Sample implementation of notification receiver.
-class TestListener : public notification_receiver
+// Sample implementation of notification listener
+class TestListener : public notify_listener
 {
-  bool m_done;
+  bool m_Done;
 
 public:
   explicit TestListener(connection_base &C) :
-	notification_receiver(C, "listen"), m_done(false) {}
+	notify_listener(C, "listen"), m_Done(false) {}
 
-  virtual void operator()(const string &, int be_pid)
+  virtual void operator()(int be_pid)
   {
-    m_done = true;
+    m_Done = true;
     PQXX_CHECK_EQUAL(
 	be_pid,
 	Backend_PID,
 	"Notification came from wrong backend process.");
   }
 
-  bool done() const { return m_done; }
+  bool Done() const { return m_Done; }
 };
 
 
-// A transactor to trigger our notification receiver.
+// A transactor to trigger our notification listener
 class Notify : public transactor<>
 {
-  string m_channel;
+  string m_notif;
 
 public:
-  explicit Notify(string channel) :
-    transactor<>("Notifier"), m_channel(channel) { }
+  explicit Notify(string NotifName) :
+    transactor<>("Notifier"), m_notif(NotifName) { }
 
   void operator()(argument_type &T)
   {
-    T.exec("NOTIFY \"" + m_channel + "\"");
+    T.exec("NOTIFY \"" + m_notif + "\"");
     Backend_PID = T.conn().backendpid();
   }
 };
@@ -60,10 +60,10 @@ void test_004(transaction_base &T)
 
   TestListener L(T.conn());
 
-  T.conn().perform(Notify(L.channel()));
+  T.conn().perform(Notify(L.name()));
 
   int notifs = 0;
-  for (int i=0; (i < 20) && !L.done(); ++i)
+  for (int i=0; (i < 20) && !L.Done(); ++i)
   {
     PQXX_CHECK_EQUAL(notifs, 0, "Got unexpected notifications.");
 
@@ -74,7 +74,7 @@ void test_004(transaction_base &T)
     notifs = T.conn().get_notifs();
   }
 
-  PQXX_CHECK_NOT_EQUAL(L.done(), false, "No notification received.");
+  PQXX_CHECK_NOT_EQUAL(L.Done(), false, "No notification received.");
   PQXX_CHECK_EQUAL(notifs, 1, "Got too many notifications.");
 }
 

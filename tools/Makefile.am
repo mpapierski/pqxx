@@ -1,7 +1,7 @@
 EXTRA_DIST = \
 	extract_version \
-	lint \
 	maketemporary \
+	preprelease \
 	release \
 	rmlo.cxx \
 	splitconfig \
@@ -9,9 +9,6 @@ EXTRA_DIST = \
 	pqxxthreadsafety.cxx
 
 INCLUDES=-I$(top_builddir)/include -I$(top_srcdir)/include ${POSTGRES_INCLUDE}
-# Override automatically generated list of default includes.  It contains only
-# unnecessary entries, and incorrectly mentions include/pqxx directly.
-DEFAULT_INCLUDES=
 
 noinst_PROGRAMS = rmlo pqxxthreadsafety
 

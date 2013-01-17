@@ -8,7 +8,7 @@
  *   pqxx::transaction_base defines the interface for any abstract class that
  *   represents a database transaction
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -21,12 +21,9 @@
 #include <cstring>
 #include <stdexcept>
 
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
-
 #include "pqxx/connection_base"
 #include "pqxx/result"
+#include "pqxx/tablestream"
 #include "pqxx/transaction_base"
 
 #include "pqxx/internal/gates/connection-transaction.hxx"
@@ -51,14 +48,12 @@ pqxx::result pqxx::internal::parameterized_invocation::exec()
 {
   scoped_array<const char *> values;
   scoped_array<int> lengths;
-  scoped_array<int> binaries;
-  const int elements = marshall(values, lengths, binaries);
+  const int elements = marshall(values, lengths);
 
   return gate::connection_parameterized_invocation(m_home).parameterized_exec(
 	m_query,
 	values.get(),
 	lengths.get(),
-	binaries.get(),
 	elements);
 }
 
@@ -84,7 +79,7 @@ pqxx::transaction_base::transaction_base(connection_base &C, bool direct) :
 pqxx::transaction_base::~transaction_base()
 {
 #ifdef PQXX_QUIET_DESTRUCTORS
-  quiet_errorhandler quiet(m_Conn);
+  disable_noticer Quiet(m_Conn);
 #endif
   try
   {
@@ -228,14 +223,7 @@ void pqxx::transaction_base::abort()
 string pqxx::transaction_base::esc_raw(const PGSTD::string &str) const
 {
   const unsigned char *p = reinterpret_cast<const unsigned char *>(str.c_str());
-  return conn().esc_raw(p, str.size());
-}
-
-
-string pqxx::transaction_base::quote_raw(const PGSTD::string &str) const
-{
-  const unsigned char *p = reinterpret_cast<const unsigned char *>(str.c_str());
-  return conn().quote_raw(p, str.size());
+  return m_Conn.esc_raw(p, str.size());
 }
 
 
@@ -291,11 +279,13 @@ pqxx::result pqxx::transaction_base::exec(const PGSTD::string &Query,
 }
 
 
+#ifdef PQXX_HAVE_PQEXECPARAMS
 pqxx::internal::parameterized_invocation
 pqxx::transaction_base::parameterized(const PGSTD::string &query)
 {
   return internal::parameterized_invocation(conn(), query);
 }
+#endif // PQXX_HAVE_PQEXECPARAMS
 
 
 pqxx::prepare::invocation
@@ -355,7 +345,7 @@ void pqxx::transaction_base::Begin()
 
 
 
-void pqxx::transaction_base::End() PQXX_NOEXCEPT
+void pqxx::transaction_base::End() throw ()
 {
   try
   {
@@ -398,7 +388,7 @@ void pqxx::transaction_base::RegisterFocus(internal::transactionfocus *S)
 
 
 void pqxx::transaction_base::UnregisterFocus(internal::transactionfocus *S)
-	PQXX_NOEXCEPT
+	throw ()
 {
   try
   {
@@ -419,7 +409,7 @@ pqxx::result pqxx::transaction_base::DirectExec(const char C[], int Retries)
 
 
 void pqxx::transaction_base::RegisterPendingError(const PGSTD::string &Err)
-	PQXX_NOEXCEPT
+	throw ()
 {
   if (m_PendingError.empty() && !Err.empty())
   {
@@ -512,7 +502,7 @@ void pqxx::internal::transactionfocus::register_me()
 }
 
 
-void pqxx::internal::transactionfocus::unregister_me() PQXX_NOEXCEPT
+void pqxx::internal::transactionfocus::unregister_me() throw ()
 {
   gate::transaction_transactionfocus gate(m_Trans);
   gate.UnregisterFocus(this);
@@ -521,7 +511,7 @@ void pqxx::internal::transactionfocus::unregister_me() PQXX_NOEXCEPT
 
 void
 pqxx::internal::transactionfocus::reg_pending_error(const PGSTD::string &err)
-	PQXX_NOEXCEPT
+	throw ()
 {
   gate::transaction_transactionfocus gate(m_Trans);
   gate.RegisterPendingError(err);

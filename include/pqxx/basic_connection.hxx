@@ -6,9 +6,9 @@
  *   DESCRIPTION
  *      definition of the pqxx::basic_connection class template
  *   Instantiations of basic_connection bring connections and policies together
- *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/basic_connection instead.
+ *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/connection_base instead.
  *
- * Copyright (c) 2006-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2006-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -26,11 +26,6 @@
 #include <string>
 
 #include "pqxx/connection_base"
-
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
-
 
 namespace pqxx
 {
@@ -70,15 +65,16 @@ public:
     m_policy(m_options)
 	{ init(); }
 
-  ~basic_connection() PQXX_NOEXCEPT
+  ~basic_connection() throw ()
   {
 #ifdef PQXX_QUIET_DESTRUCTORS
-    quiet_errorhandler quiet(*this);
+    PGSTD::auto_ptr<noticer> n(new nonnoticer);
+    set_noticer(n);
 #endif
     close();
   }
 
-  const PGSTD::string &options() const PQXX_NOEXCEPT			//[t1]
+  const PGSTD::string &options() const throw ()				//[t1]
 	{return m_policy.options();}
 
 private:
@@ -93,3 +89,4 @@ private:
 #include "pqxx/compiler-internal-post.hxx"
 
 #endif
+

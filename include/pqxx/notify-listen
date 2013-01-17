@@ -4,10 +4,10 @@
  *	pqxx/notify-listen
  *
  *   DESCRIPTION
- *      Obsolete pqxx::notify_listener functor interface.
- *   Predecessor to notification_receiver.  Deprecated.  Do not use.
+ *      pqxx::notify_listener functor interface.
+ *   pqxx::notify_listener describes an action waiting on a notification
  *
- * Copyright (c) 2007-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2007-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,

@@ -7,7 +7,7 @@
  *      implementation of the pqxx::tablereader class.
  *   pqxx::tablereader enables optimized batch reads from a database table
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -16,10 +16,6 @@
  *-------------------------------------------------------------------------
  */
 #include "pqxx/compiler-internal.hxx"
-
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
 
 #include "pqxx/tablereader"
 #include "pqxx/transaction"
@@ -49,10 +45,10 @@ void pqxx::tablereader::setup(transaction_base &T,
   m_Done = false;
 }
 
-pqxx::tablereader::~tablereader() PQXX_NOEXCEPT
+pqxx::tablereader::~tablereader() throw ()
 {
 #ifdef PQXX_QUIET_DESTRUCTORS
-  quiet_errorhandler quiet(m_Trans.conn());
+  disable_noticer Quiet(m_Trans.conn());
 #endif
   try
   {
@@ -116,7 +112,7 @@ void pqxx::tablereader::reader_close()
 
 namespace
 {
-inline bool is_octalchar(char o) PQXX_NOEXCEPT
+inline bool is_octalchar(char o) throw ()
 {
   return (o>='0') && (o<='7');
 }

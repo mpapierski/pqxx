@@ -7,7 +7,7 @@
  *      implementation of libpqxx STL-style cursor classes.
  *   These classes wrap SQL cursors in STL-like interfaces
  *
- * Copyright (c) 2004-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2004-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -149,7 +149,7 @@ pqxx::internal::sql_cursor::sql_cursor(transaction_base &t,
 }
 
 
-void pqxx::internal::sql_cursor::close() PQXX_NOEXCEPT
+void pqxx::internal::sql_cursor::close() throw ()
 {
   if (m_ownership==cursor_base::owned)
   {
@@ -263,7 +263,7 @@ cursor_base::difference_type pqxx::internal::sql_cursor::move(
 
   // Starting with the libpq in PostgreSQL 7.4, PQcmdTuples() (which we call
   // indirectly here) also returns the number of rows skipped by a MOVE
-  difference_type d = difference_type(r.affected_rows());
+  difference_type d = static_cast<difference_type>(r.affected_rows());
 
   // We may not have PQcmdTuples(), or this may be a libpq version that doesn't
   // implement it for MOVE yet.  We'll also get zero if we decide to use a
@@ -360,7 +360,7 @@ pqxx::icursorstream::icursorstream(
 
 pqxx::icursorstream::icursorstream(
     transaction_base &context,
-    const field &cname,
+    const result::field &cname,
     difference_type sstride,
     cursor_base::ownershippolicy op) :
   m_cur(context, cname.c_str(), op),
@@ -392,7 +392,7 @@ result pqxx::icursorstream::fetchblock()
 
 icursorstream &pqxx::icursorstream::ignore(PGSTD::streamsize n)
 {
-  difference_type offset = m_cur.move(difference_type(n));
+  difference_type offset = m_cur.move(n);
   m_realpos += offset;
   if (offset < n) m_done = true;
   return *this;
@@ -402,11 +402,11 @@ icursorstream &pqxx::icursorstream::ignore(PGSTD::streamsize n)
 icursorstream::size_type pqxx::icursorstream::forward(size_type n)
 {
   m_reqpos += difference_type(n) * m_stride;
-  return icursorstream::size_type(m_reqpos);
+  return size_type(m_reqpos);
 }
 
 
-void pqxx::icursorstream::insert_iterator(icursor_iterator *i) PQXX_NOEXCEPT
+void pqxx::icursorstream::insert_iterator(icursor_iterator *i) throw ()
 {
   gate::icursor_iterator_icursorstream(*i).set_next(m_iterators);
   if (m_iterators)
@@ -415,8 +415,7 @@ void pqxx::icursorstream::insert_iterator(icursor_iterator *i) PQXX_NOEXCEPT
 }
 
 
-void pqxx::icursorstream::remove_iterator(icursor_iterator *i)
-	const PQXX_NOEXCEPT
+void pqxx::icursorstream::remove_iterator(icursor_iterator *i) const throw ()
 {
   gate::icursor_iterator_icursorstream igate(*i);
   if (i == m_iterators)
@@ -462,7 +461,7 @@ void pqxx::icursorstream::service_iterators(difference_type topos)
 }
 
 
-pqxx::icursor_iterator::icursor_iterator() PQXX_NOEXCEPT :
+pqxx::icursor_iterator::icursor_iterator() throw () :
   m_stream(0),
   m_here(),
   m_pos(0),
@@ -471,7 +470,7 @@ pqxx::icursor_iterator::icursor_iterator() PQXX_NOEXCEPT :
 {
 }
 
-pqxx::icursor_iterator::icursor_iterator(istream_type &s) PQXX_NOEXCEPT :
+pqxx::icursor_iterator::icursor_iterator(istream_type &s) throw () :
   m_stream(&s),
   m_here(),
   m_pos(difference_type(gate::icursorstream_icursor_iterator(s).forward(0))),
@@ -481,8 +480,7 @@ pqxx::icursor_iterator::icursor_iterator(istream_type &s) PQXX_NOEXCEPT :
   gate::icursorstream_icursor_iterator(*m_stream).insert_iterator(this);
 }
 
-pqxx::icursor_iterator::icursor_iterator(const icursor_iterator &rhs)
-	PQXX_NOEXCEPT :
+pqxx::icursor_iterator::icursor_iterator(const icursor_iterator &rhs) throw () :
   m_stream(rhs.m_stream),
   m_here(rhs.m_here),
   m_pos(rhs.m_pos),
@@ -494,7 +492,7 @@ pqxx::icursor_iterator::icursor_iterator(const icursor_iterator &rhs)
 }
 
 
-pqxx::icursor_iterator::~icursor_iterator() PQXX_NOEXCEPT
+pqxx::icursor_iterator::~icursor_iterator() throw ()
 {
   if (m_stream)
     gate::icursorstream_icursor_iterator(*m_stream).remove_iterator(this);
@@ -528,15 +526,14 @@ icursor_iterator &pqxx::icursor_iterator::operator+=(difference_type n)
     throw argument_error("Advancing icursor_iterator by negative offset");
   }
   m_pos = difference_type(
-	gate::icursorstream_icursor_iterator(*m_stream).forward(
-		icursorstream::size_type(n)));
+	gate::icursorstream_icursor_iterator(*m_stream).forward(size_type(n)));
   m_here.clear();
   return *this;
 }
 
 
 icursor_iterator &
-pqxx::icursor_iterator::operator=(const icursor_iterator &rhs) PQXX_NOEXCEPT
+pqxx::icursor_iterator::operator=(const icursor_iterator &rhs) throw ()
 {
   if (rhs.m_stream == m_stream)
   {

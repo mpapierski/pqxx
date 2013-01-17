@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template '/home/jtv/proj/libpqxx/trunk/win32/vc-test.mak.template'.
+# Generated from template '/home/jtv/proj/libpqxx/branches/3.1/win32/vc-test.mak.template'.
 ################################################################################
 # Visual C++ Makefile for libpqxx test suite
 # This file was written by Bart Samwel.
@@ -35,6 +35,14 @@ LIBDIR=lib
 CXX=cl.exe
 LINK=link.exe
 
+
+CXX_FLAGS_BASE=/nologo /W3 /GX /FD /GR /YX /c \
+    /I "include" /I "$(PGSQLSRC)/include" /I "$(PGSQLSRC)/interfaces/libpq" \
+    /D "WIN32" /D "_CONSOLE" /D "_MBCS" /D "_WINDOWS" $(PQXX_SHARED)
+
+LINK_FLAGS_BASE=kernel32.lib wsock32.lib advapi32.lib /nologo /machine:I386 /libpath:"$(LIBDIR)"
+
+
 !IF "$(DLL)" == "1"
 PQXX_SHARED=/D "PQXX_SHARED"
 PQXXLIBTYPE=Dll
@@ -46,44 +54,36 @@ PQXXLIBEXT=lib
 PQXXLIBTYPESUFFIX=_static
 !ENDIF
 
-
-CXX_FLAGS_BASE=/nologo /W3 /EHsc /FD /GR /c \
-    /I "include" /D "WIN32" /D "_CONSOLE" /D "_MBCS" /D "_WINDOWS" $(PQXX_SHARED)
-
-LINK_FLAGS_BASE=kernel32.lib ws2_32.lib advapi32.lib /nologo /machine:I386 /libpath:"$(LIBDIR)"
-
-
 !IF "$(DEBUG)" == "1"
 BUILDMODE=Debug
 DEBUGSUFFIX=D
-CXX_FLAGS=$(CXX_FLAGS_BASE) /MDd /Gm /ZI /Od /D "_DEBUG" /RTC1
-LINK_FLAGS=$(LINK_FLAGS_BASE) $(LIBPQDLIB) /debug
-LIBPQ=$(LIBPQDDLL)
+CXX_FLAGS=$(CXX_FLAGS_BASE) /MDd /Gm /ZI /Od /D "_DEBUG" /GZ
+LINK_FLAGS=$(LINK_FLAGS_BASE) /debug /libpath:$(LIBPATH2)
 !ELSE
 BUILDMODE=Release
 DEBUGSUFFIX=
 CXX_FLAGS=$(CXX_FLAGS_BASE) /MD /D "NDEBUG"
-LINK_FLAGS=$(LINK_FLAGS_BASE) $(LIBPQLIB)
-LIBPQ=$(LIBPQDLL)
+LINK_FLAGS=$(LINK_FLAGS_BASE) /libpath:$(LIBPATH1)
 !ENDIF
 
 
 INTDIR=Test$(PQXXLIBTYPE)$(BUILDMODE)
-PQXXLIB=libpqxx$(PQXXLIBTYPESUFFIX)$(DEBUGSUFFIX).lib
-PQXX=libpqxx$(DEBUGSUFFIX).dll
+PQXXSUBPATH=libpqxx$(PQXXLIBTYPESUFFIX)$(DEBUGSUFFIX).$(PQXXLIBEXT)
+PQXX=$(LIBDIR)\$(PQXXSUBPATH)
+PQXXCOPY=$(INTDIR)\$(PQXXSUBPATH)
+LIBPQ=libpq$(DEBUGSUFFIX).dll
 
-!IF "$(DLL)" == "1"
-DLLS=$(INTDIR)\$(LIBPQ) $(INTDIR)\$(PQXX)
-!ELSE
-DLLS=$(INTDIR)\$(LIBPQ)
-!ENDIF
 
 OBJS= \
   $(INTDIR)\test000.obj \
   $(INTDIR)\test001.obj \
   $(INTDIR)\test002.obj \
   $(INTDIR)\test004.obj \
+  $(INTDIR)\test005.obj \
+  $(INTDIR)\test006.obj \
   $(INTDIR)\test007.obj \
+  $(INTDIR)\test008.obj \
+  $(INTDIR)\test009.obj \
   $(INTDIR)\test010.obj \
   $(INTDIR)\test011.obj \
   $(INTDIR)\test012.obj \
@@ -96,7 +96,11 @@ OBJS= \
   $(INTDIR)\test020.obj \
   $(INTDIR)\test021.obj \
   $(INTDIR)\test023.obj \
+  $(INTDIR)\test024.obj \
+  $(INTDIR)\test025.obj \
   $(INTDIR)\test026.obj \
+  $(INTDIR)\test027.obj \
+  $(INTDIR)\test028.obj \
   $(INTDIR)\test029.obj \
   $(INTDIR)\test030.obj \
   $(INTDIR)\test031.obj \
@@ -128,6 +132,7 @@ OBJS= \
   $(INTDIR)\test065.obj \
   $(INTDIR)\test066.obj \
   $(INTDIR)\test067.obj \
+  $(INTDIR)\test068.obj \
   $(INTDIR)\test069.obj \
   $(INTDIR)\test070.obj \
   $(INTDIR)\test071.obj \
@@ -139,6 +144,7 @@ OBJS= \
   $(INTDIR)\test077.obj \
   $(INTDIR)\test078.obj \
   $(INTDIR)\test079.obj \
+  $(INTDIR)\test080.obj \
   $(INTDIR)\test082.obj \
   $(INTDIR)\test083.obj \
   $(INTDIR)\test084.obj \
@@ -162,7 +168,8 @@ all: runner
 runner: $(INTDIR) $(INTDIR)\runner.exe
 
 clean:
-	-@del /Q $(INTDIR)\*.*
+	-@del /Q vc70.pch
+	-@del /Q $(OBJS) $(INTDIR)\*.exe
 
 $(INTDIR):
 	@mkdir $(INTDIR)
@@ -173,13 +180,15 @@ $(INTDIR):
 ########################################################
 
 
-$(INTDIR)\runner.success: $(INTDIR)\runner.exe
+$(INTDIR)\runner.success: $(INTDIR)\runner.exe \
+  $(INTDIR)\$(LIBPQXX) $(PQXX) 
+	@copy $(PQXX) $(PQXXCOPY)
 	@$(INTDIR)\runner.exe
 	@echo >$(INTDIR)\runner.success
 
 
-$(INTDIR)\runner.exe: $(OBJS) $(DLLS)
-	@$(LINK) $(LINK_FLAGS) $(OBJS) $(PQXXLIB) \
+$(INTDIR)\runner.exe: $(OBJS) $(PQXX)
+	@$(LINK) $(LINK_FLAGS) "$(INTDIR)\\runner.obj" $(OBJS) \
 		/out:"$(INTDIR)\\runner.exe"
 
 
@@ -193,8 +202,16 @@ $(INTDIR)\test002.obj:
 	@$(CXX) $(CXX_FLAGS) test/test002.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test004.obj:
 	@$(CXX) $(CXX_FLAGS) test/test004.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test005.obj:
+	@$(CXX) $(CXX_FLAGS) test/test005.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test006.obj:
+	@$(CXX) $(CXX_FLAGS) test/test006.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test007.obj:
 	@$(CXX) $(CXX_FLAGS) test/test007.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test008.obj:
+	@$(CXX) $(CXX_FLAGS) test/test008.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test009.obj:
+	@$(CXX) $(CXX_FLAGS) test/test009.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test010.obj:
 	@$(CXX) $(CXX_FLAGS) test/test010.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test011.obj:
@@ -219,8 +236,16 @@ $(INTDIR)\test021.obj:
 	@$(CXX) $(CXX_FLAGS) test/test021.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test023.obj:
 	@$(CXX) $(CXX_FLAGS) test/test023.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test024.obj:
+	@$(CXX) $(CXX_FLAGS) test/test024.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test025.obj:
+	@$(CXX) $(CXX_FLAGS) test/test025.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test026.obj:
 	@$(CXX) $(CXX_FLAGS) test/test026.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test027.obj:
+	@$(CXX) $(CXX_FLAGS) test/test027.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test028.obj:
+	@$(CXX) $(CXX_FLAGS) test/test028.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test029.obj:
 	@$(CXX) $(CXX_FLAGS) test/test029.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test030.obj:
@@ -283,6 +308,8 @@ $(INTDIR)\test066.obj:
 	@$(CXX) $(CXX_FLAGS) test/test066.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test067.obj:
 	@$(CXX) $(CXX_FLAGS) test/test067.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test068.obj:
+	@$(CXX) $(CXX_FLAGS) test/test068.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test069.obj:
 	@$(CXX) $(CXX_FLAGS) test/test069.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test070.obj:
@@ -305,6 +332,8 @@ $(INTDIR)\test078.obj:
 	@$(CXX) $(CXX_FLAGS) test/test078.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test079.obj:
 	@$(CXX) $(CXX_FLAGS) test/test079.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
+$(INTDIR)\test080.obj:
+	@$(CXX) $(CXX_FLAGS) test/test080.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test082.obj:
 	@$(CXX) $(CXX_FLAGS) test/test082.cxx /Fo"$(INTDIR)\\" /Fd"$(INTDIR)\\"
 $(INTDIR)\test083.obj:
@@ -332,5 +361,3 @@ $(INTDIR)\test094.obj:
 $(INTDIR)\$(LIBPQ):
 	@copy $(LIBDIR)\$(LIBPQ) $(INTDIR)
 
-$(INTDIR)\$(PQXX):
-	@copy $(LIBDIR)\$(PQXX) $(INTDIR)

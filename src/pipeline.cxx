@@ -7,7 +7,7 @@
  *      implementation of the pqxx::pipeline class
  *   Throughput-optimized query manager
  *
- * Copyright (c) 2003-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2003-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -16,10 +16,6 @@
  *-------------------------------------------------------------------------
  */
 #include "pqxx/compiler-internal.hxx"
-
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
 
 #include "pqxx/dbtransaction"
 #include "pqxx/pipeline"
@@ -58,10 +54,10 @@ pqxx::pipeline::pipeline(transaction_base &t, const PGSTD::string &Name) :
 }
 
 
-pqxx::pipeline::~pipeline() PQXX_NOEXCEPT
+pqxx::pipeline::~pipeline() throw ()
 {
 #ifdef PQXX_QUIET_DESTRUCTORS
-  quiet_errorhandler quiet(m_Trans.conn());
+  disable_noticer Quiet(m_Trans.conn());
 #endif
   try { cancel(); } catch (const exception &) {}
   detach();
@@ -227,8 +223,8 @@ void pqxx::pipeline::issue()
 
   // Construct cumulative query string for entire batch
   string cum = separated_list(theSeparator,oldest,m_queries.end(),getquery());
-  const QueryMap::size_type num_issued =
-    QueryMap::size_type(internal::distance(oldest, m_queries.end()));
+  const QueryMap::size_type num_issued = QueryMap::size_type(
+    internal::distance(oldest, m_queries.end()));
   const bool prepend_dummy = (num_issued > 1);
   if (prepend_dummy) cum = theDummyQuery + cum;
 
@@ -243,6 +239,7 @@ void pqxx::pipeline::issue()
 
 
 void pqxx::pipeline::internal_error(const PGSTD::string &err)
+	throw (logic_error)
 {
   set_error_at(0);
   throw pqxx::internal_error(err);

@@ -1,3 +1,5 @@
+#include <pqxx/compiler-internal.hxx>
+
 #include <iostream>
 
 #include "test_helpers.hxx"
@@ -28,6 +30,12 @@ string SetDatestyle(transaction_base &T, string style)
 }
 
 
+void CheckDatestyle(transaction_base &T, string expected)
+{
+  PQXX_CHECK_EQUAL(GetDatestyle(T), expected, "Got wrong datestyle.");
+}
+
+
 void RedoDatestyle(transaction_base &T, string style, string expected)
 {
   PQXX_CHECK_EQUAL(SetDatestyle(T, style), expected, "Set wrong datestyle.");
@@ -46,7 +54,7 @@ void test_061(transaction_base &T)
   RedoDatestyle(T, "SQL", SQLname);
 
    // Prove that setting an unknown variable causes an error, as expected
-  quiet_errorhandler d(T.conn());
+  disable_noticer d(T.conn());
   PQXX_CHECK_THROWS(
 	T.set_variable("NONEXISTENT_VARIABLE_I_HOPE", "1"),
 	sql_error,

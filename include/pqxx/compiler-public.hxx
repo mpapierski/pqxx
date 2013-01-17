@@ -6,7 +6,7 @@
  *   DESCRIPTION
  *      Compiler deficiency workarounds for libpqxx clients
  *
- * Copyright (c) 2002-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2002-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -19,19 +19,6 @@
 
 #ifdef PQXX_HAVE_BOOST_SMART_PTR
 #include <boost/smart_ptr.hpp>
-#endif
-
-#ifdef PQXX_HAVE_MOVE
-#include <utility>
-#define PQXX_MOVE(value) (PGSTD::move(value))
-#else
-#define PQXX_MOVE(value) (value)
-#endif
-
-#ifdef PQXX_HAVE_NOEXCEPT
-#define PQXX_NOEXCEPT noexcept
-#else
-#define PQXX_NOEXCEPT throw ()
 #endif
 
 #ifdef _MSC_VER
@@ -140,30 +127,11 @@ template<> struct char_traits<unsigned char>
 #define __USE_STD_IOSTREAM
 #endif	// __DECCXX_VER
 
-#if defined(__GNUC__) && defined(PQXX_HAVE_GCC_CONST)
-#define PQXX_CONST __attribute__ ((const))
-#else
-#define PQXX_CONST
-#endif
-
 #if defined(__GNUC__) && defined(PQXX_HAVE_GCC_DEPRECATED)
 #define PQXX_DEPRECATED __attribute__ ((deprecated))
 #else
 #define PQXX_DEPRECATED
 #endif
-
-#if defined(__GNUC__) && defined(PQXX_HAVE_GCC_NORETURN)
-#define PQXX_NORETURN __attribute__ ((noreturn))
-#else
-#define PQXX_NORETURN
-#endif
-
-#if defined(__GNUC__) && defined(PQXX_HAVE_GCC_PURE)
-#define PQXX_PURE __attribute__ ((pure))
-#else
-#define PQXX_PURE
-#endif
-
 
 // Workarounds for Windows
 #ifdef _WIN32

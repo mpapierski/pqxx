@@ -7,7 +7,7 @@
  *      implementation of the pqxx::tablewriter class.
  *   pqxx::tablewriter enables optimized batch updates to a database table
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -16,10 +16,6 @@
  *-------------------------------------------------------------------------
  */
 #include "pqxx/compiler-internal.hxx"
-
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
 
 #include "pqxx/tablereader"
 #include "pqxx/tablewriter"
@@ -41,10 +37,10 @@ pqxx::tablewriter::tablewriter(transaction_base &T,
 }
 
 
-pqxx::tablewriter::~tablewriter() PQXX_NOEXCEPT
+pqxx::tablewriter::~tablewriter() throw ()
 {
 #ifdef PQXX_QUIET_DESTRUCTORS
-  quiet_errorhandler quiet(m_Trans.conn());
+  disable_noticer Quiet(m_Trans.conn());
 #endif
   try
   {
@@ -132,10 +128,8 @@ inline bool unprintable(char i)
   return i < ' ' || i > '~';
 }
 
-inline char tooctdigit(char c, int n)
+inline char tooctdigit(unsigned int i, int n)
 {
-  typedef unsigned char unsigned_char;
-  unsigned int i = unsigned_char(c);
   return number_to_digit((i>>(3*n)) & 0x07);
 }
 } // namespace
@@ -162,7 +156,8 @@ string pqxx::internal::Escape(const string &s, const string &null)
     else if (unprintable(c))
     {
       R += "\\\\";
-      for (int n=2; n>=0; --n) R += tooctdigit(c, n);
+      unsigned char u = static_cast<unsigned char>(c);
+      for (int n=2; n>=0; --n) R += tooctdigit(u,n);
     }
     else
     {

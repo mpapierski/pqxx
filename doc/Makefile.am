@@ -33,19 +33,8 @@ docs: $(DOCS)
 
 reference: reference-stamp
 reference-stamp: Doxyfile.in $(REFERENCE_STAMP_DEPENDENCIES)
-	if test -x "$(DOXYGEN)"; then \
-	  $(DOXYGEN) Doxyfile; \
-	  touch $@; \
-	else \
-	  echo >&2; \
-	  echo >&2 "*****************************************************"; \
-	  echo >&2; \
-	  echo >&2 "Doxygen not found."; \
-	  echo >&2 "Install it, or configure with --disable-documentation"; \
-	  echo >&2; \
-	  echo >&2 "*****************************************************"; \
-	  exit 1; \
-	fi
+	$(DOXYGEN) Doxyfile
+	touch $@
 
 ../src/libpqxx.la:
 	cd ../src; \
@@ -53,19 +42,8 @@ reference-stamp: Doxyfile.in $(REFERENCE_STAMP_DEPENDENCIES)
 
 tutorial: tutorial-stamp
 tutorial-stamp: libpqxx.xml
-	if test -x "$(XMLTO)"; then \
-	  $(XMLTO) -o html/Tutorial xhtml $<; \
-	  touch $@; \
-	else \
-	  echo >&2; \
-	  echo >&2 "*****************************************************"; \
-	  echo >&2; \
-	  echo >&2 "xmlto not found."; \
-	  echo >&2 "Install it, or configure with --disable-documentation"; \
-	  echo >&2; \
-	  echo >&2 "*****************************************************"; \
-	  exit 1; \
-	fi
+	$(XMLTO) -o html/Tutorial xhtml $<
+	touch $@
 
 DISTHOOKDIRS = html/Reference html/Tutorial
 

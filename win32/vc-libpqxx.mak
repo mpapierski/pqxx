@@ -9,7 +9,7 @@
 # The template2mak.py script should be available in the tools directory of the
 # libpqxx source archive.
 #
-# Generated from template '/home/jtv/proj/libpqxx/trunk/win32/vc-libpqxx.mak.template'.
+# Generated from template '/home/jtv/proj/libpqxx/branches/3.1/win32/vc-libpqxx.mak.template'.
 ################################################################################
 # Visual C++ makefile for libpqxx
 # This file was created by Bart Samwel.
@@ -43,9 +43,9 @@ default:
 
 !IF "$(OS)" == "Windows_NT"
 NULL=
-!ELSE
+!ELSE 
 NULL=nul
-!ENDIF
+!ENDIF 
 
 !include win32/common
 
@@ -77,18 +77,19 @@ LIBTOOL=link.exe -lib
 
 # The options common to all the different builds.
 CXX_FLAGS_BASE=/nologo /W3 /EHsc /FD /GR /c \
-    /I "include" /I $(PGSQLINC) /I $(LIBPQINC) \
-    /D PGSTD=$(STD) /D "WIN32" /D "_MBCS" /D "_WINDOWS" /D "PQXX_INTERNAL"
+    /I "include" /I $(PGSQLSRC)\include /I $(PGSQLSRC)\interfaces\libpq \
+    /D PGSTD=$(STD) /D "WIN32" /D "_MBCS" /D "_WINDOWS" /D "PQXX_INTERNAL" \
+    /D "PQXX_AUTOLINK"
 
 CXX_FLAGS_DLLRELEASE=$(CXX_FLAGS_BASE) /MD  /D "NDEBUG" /D "PQXX_SHARED"
 CXX_FLAGS_DLLDEBUG=$(CXX_FLAGS_BASE) /MDd /Gm /ZI /Od /D "_DEBUG" /D "PQXX_SHARED" /RTC1
 CXX_FLAGS_STATICRELEASE=$(CXX_FLAGS_BASE) /MD /D "_LIB" /D "NDEBUG"
 CXX_FLAGS_STATICDEBUG=$(CXX_FLAGS_BASE) /MDd /Gm /ZI /Od /D "_LIB" /D "_DEBUG" /RTC1
 
-LINK_FLAGS_BASE=kernel32.lib ws2_32.lib advapi32.lib /nologo /dll /machine:I386 shell32.lib secur32.lib wldap32.lib
+LINK_FLAGS_BASE=kernel32.lib wsock32.lib advapi32.lib /nologo /dll /machine:I386 /libpath:$(LIBPATH1) /libpath:$(LIBPATH2)
 
-LINK_FLAGS_DLLRELEASE=$(LINK_FLAGS_BASE) /libpath:$(LIBPQPATH) $(LIBPQLIB)
-LINK_FLAGS_DLLDEBUG=$(LINK_FLAGS_BASE) /libpath:$(LIBPQDPATH) $(LIBPQDLIB) /debug
+LINK_FLAGS_DLLRELEASE=$(LINK_FLAGS_BASE)
+LINK_FLAGS_DLLDEBUG=$(LINK_FLAGS_BASE) /debug
 
 LIB_FLAGS=/nologo
 
@@ -104,12 +105,9 @@ OBJ_STATICDEBUG=\
        "$(INTDIR_STATICDEBUG)\connection_base.obj" \
        "$(INTDIR_STATICDEBUG)\cursor.obj" \
        "$(INTDIR_STATICDEBUG)\dbtransaction.obj" \
-       "$(INTDIR_STATICDEBUG)\errorhandler.obj" \
        "$(INTDIR_STATICDEBUG)\except.obj" \
-       "$(INTDIR_STATICDEBUG)\field.obj" \
        "$(INTDIR_STATICDEBUG)\largeobject.obj" \
        "$(INTDIR_STATICDEBUG)\nontransaction.obj" \
-       "$(INTDIR_STATICDEBUG)\notification.obj" \
        "$(INTDIR_STATICDEBUG)\notify-listen.obj" \
        "$(INTDIR_STATICDEBUG)\pipeline.obj" \
        "$(INTDIR_STATICDEBUG)\prepared_statement.obj" \
@@ -123,7 +121,6 @@ OBJ_STATICDEBUG=\
        "$(INTDIR_STATICDEBUG)\tablewriter.obj" \
        "$(INTDIR_STATICDEBUG)\transaction.obj" \
        "$(INTDIR_STATICDEBUG)\transaction_base.obj" \
-       "$(INTDIR_STATICDEBUG)\tuple.obj" \
        "$(INTDIR_STATICDEBUG)\util.obj" \
 
 OBJ_STATICRELEASE=\
@@ -132,12 +129,9 @@ OBJ_STATICRELEASE=\
        "$(INTDIR_STATICRELEASE)\connection_base.obj" \
        "$(INTDIR_STATICRELEASE)\cursor.obj" \
        "$(INTDIR_STATICRELEASE)\dbtransaction.obj" \
-       "$(INTDIR_STATICRELEASE)\errorhandler.obj" \
        "$(INTDIR_STATICRELEASE)\except.obj" \
-       "$(INTDIR_STATICRELEASE)\field.obj" \
        "$(INTDIR_STATICRELEASE)\largeobject.obj" \
        "$(INTDIR_STATICRELEASE)\nontransaction.obj" \
-       "$(INTDIR_STATICRELEASE)\notification.obj" \
        "$(INTDIR_STATICRELEASE)\notify-listen.obj" \
        "$(INTDIR_STATICRELEASE)\pipeline.obj" \
        "$(INTDIR_STATICRELEASE)\prepared_statement.obj" \
@@ -151,7 +145,6 @@ OBJ_STATICRELEASE=\
        "$(INTDIR_STATICRELEASE)\tablewriter.obj" \
        "$(INTDIR_STATICRELEASE)\transaction.obj" \
        "$(INTDIR_STATICRELEASE)\transaction_base.obj" \
-       "$(INTDIR_STATICRELEASE)\tuple.obj" \
        "$(INTDIR_STATICRELEASE)\util.obj" \
 
 OBJ_DLLDEBUG=\
@@ -160,12 +153,9 @@ OBJ_DLLDEBUG=\
        "$(INTDIR_DLLDEBUG)\connection_base.obj" \
        "$(INTDIR_DLLDEBUG)\cursor.obj" \
        "$(INTDIR_DLLDEBUG)\dbtransaction.obj" \
-       "$(INTDIR_DLLDEBUG)\errorhandler.obj" \
        "$(INTDIR_DLLDEBUG)\except.obj" \
-       "$(INTDIR_DLLDEBUG)\field.obj" \
        "$(INTDIR_DLLDEBUG)\largeobject.obj" \
        "$(INTDIR_DLLDEBUG)\nontransaction.obj" \
-       "$(INTDIR_DLLDEBUG)\notification.obj" \
        "$(INTDIR_DLLDEBUG)\notify-listen.obj" \
        "$(INTDIR_DLLDEBUG)\pipeline.obj" \
        "$(INTDIR_DLLDEBUG)\prepared_statement.obj" \
@@ -179,7 +169,6 @@ OBJ_DLLDEBUG=\
        "$(INTDIR_DLLDEBUG)\tablewriter.obj" \
        "$(INTDIR_DLLDEBUG)\transaction.obj" \
        "$(INTDIR_DLLDEBUG)\transaction_base.obj" \
-       "$(INTDIR_DLLDEBUG)\tuple.obj" \
        "$(INTDIR_DLLDEBUG)\util.obj" \
        "$(INTDIR_DLLDEBUG)\libpqxx.obj" \
 
@@ -189,12 +178,9 @@ OBJ_DLLRELEASE=\
        "$(INTDIR_DLLRELEASE)\connection_base.obj" \
        "$(INTDIR_DLLRELEASE)\cursor.obj" \
        "$(INTDIR_DLLRELEASE)\dbtransaction.obj" \
-       "$(INTDIR_DLLRELEASE)\errorhandler.obj" \
        "$(INTDIR_DLLRELEASE)\except.obj" \
-       "$(INTDIR_DLLRELEASE)\field.obj" \
        "$(INTDIR_DLLRELEASE)\largeobject.obj" \
        "$(INTDIR_DLLRELEASE)\nontransaction.obj" \
-       "$(INTDIR_DLLRELEASE)\notification.obj" \
        "$(INTDIR_DLLRELEASE)\notify-listen.obj" \
        "$(INTDIR_DLLRELEASE)\pipeline.obj" \
        "$(INTDIR_DLLRELEASE)\prepared_statement.obj" \
@@ -208,7 +194,6 @@ OBJ_DLLRELEASE=\
        "$(INTDIR_DLLRELEASE)\tablewriter.obj" \
        "$(INTDIR_DLLRELEASE)\transaction.obj" \
        "$(INTDIR_DLLRELEASE)\transaction_base.obj" \
-       "$(INTDIR_DLLRELEASE)\tuple.obj" \
        "$(INTDIR_DLLRELEASE)\util.obj" \
        "$(INTDIR_DLLRELEASE)\libpqxx.obj" \
 
@@ -227,12 +212,13 @@ all: static dll
 $(OUTDIR):
 	-@mkdir $(OUTDIR)
 
-staticdebug: $(OUTFILE_STATICDEBUG).lib $(OUTDIR) $(OUTDIR)\$(LIBPQDDLL) $(OUTDIR)\$(LIBPQDLIB)
-staticrelease: $(OUTFILE_STATICRELEASE).lib $(OUTDIR) $(OUTDIR)\$(LIBPQDLL) $(OUTDIR)\$(LIBPQLIB)
+staticdebug: $(OUTFILE_STATICDEBUG).lib $(OUTDIR) $(OUTDIR)\libpqd.dll
 
-dlldebug: $(OUTFILE_DLLDEBUG).dll $(OUTDIR) $(OUTDIR)\$(LIBPQDDLL)
+staticrelease: $(OUTFILE_STATICRELEASE).lib $(OUTDIR) $(OUTDIR)\libpq.dll
 
-dllrelease: $(OUTFILE_DLLRELEASE).dll $(OUTDIR) $(OUTDIR)\$(LIBPQDLL)
+dlldebug: $(OUTFILE_DLLDEBUG).dll $(OUTDIR) $(OUTDIR)\libpqd.dll
+
+dllrelease: $(OUTFILE_DLLRELEASE).dll $(OUTDIR) $(OUTDIR)\libpq.dll
 
 clean:
 	@echo Deleting all intermediate output files and the contents of $(OUTDIR).
@@ -248,35 +234,29 @@ clean:
 # Physical targets
 ########################################################
 
-$(OUTDIR)\$(LIBPQDLL): $(OUTDIR)
+$(OUTDIR)\libpq.dll: $(OUTDIR)
 	@echo -------------------------------------------------------------
-	@echo Copying $(LIBPQDLL) to $(OUTDIR).
+	@echo Copying libpq.dll to $(OUTDIR).
 	@echo.
-	@echo IMPORTANT: you MUST copy this $(LIBPQDLL) into the directory
-	@echo where your program's .EXE resides. The system $(LIBPQDLL) is
+	@echo IMPORTANT: you MUST copy this libpq.dll into the directory
+	@echo where your program's .EXE resides. The system libpq.dll is
 	@echo not necessarily compatible with the libpq include files that
 	@echo you built libpqxx with. Do NOT copy this file into your
 	@echo Windows system32 directory, that may break other programs.
 	@echo Instead, keep it with your program and distribute it along
 	@echo with the program.
 	@echo -------------------------------------------------------------
-	copy $(LIBPQPATH)\$(LIBPQDLL) $(OUTDIR)
+	copy $(PGSQLSRC)\interfaces\libpq\release\libpq.dll $(OUTDIR)
 
-$(OUTDIR)\$(LIBPQDDLL): $(OUTDIR)
+$(OUTDIR)\libpqd.dll: $(OUTDIR)
 	@echo -------------------------------------------------------------
-	@echo Copying $(LIBPQDDLL) to $(OUTDIR).
+	@echo Copying libpqD.dll to $(OUTDIR).
 	@echo.
-	@echo IMPORTANT: you MUST copy this $(LIBPQDDLL) into the directory
+	@echo IMPORTANT: you MUST copy this libpqd.dll into the directory
 	@echo where your program's .EXE resides, or you must make sure that
 	@echo it is in your system PATH.
 	@echo -------------------------------------------------------------
-	copy $(LIBPQDPATH)\$(LIBPQDDLL) $(OUTDIR)
-
-$(OUTDIR)\$(LIBPQLIB): $(OUTDIR)
-	copy $(LIBPQPATH)\$(LIBPQLIB) $(OUTDIR)
-
-$(OUTDIR)\$(LIBPQDLIB): $(OUTDIR)
-	copy $(LIBPQDPATH)\$(LIBPQDLIB) $(OUTDIR)
+	copy $(PGSQLSRC)\interfaces\libpq\debug\libpqd.dll $(OUTDIR)
 
 $(OUTFILE_STATICDEBUG).lib: $(OUTDIR) $(OBJ_STATICDEBUG)
 	$(LIBTOOL) $(LIB_FLAGS) $(OBJ_STATICDEBUG) /out:"$(OUTFILE_STATICDEBUG).lib"
@@ -347,25 +327,11 @@ $(INTDIR_DLLRELEASE):
 	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/dbtransaction.cxx
 
 
-"$(INTDIR_STATICRELEASE)\errorhandler.obj": src/errorhandler.cxx $(INTDIR_STATICRELEASE)
-	$(CXX) $(CXX_FLAGS_STATICRELEASE) /Fo"$(INTDIR_STATICRELEASE)\\" /Fd"$(INTDIR_STATICRELEASE)\\" src/errorhandler.cxx
-
-"$(INTDIR_STATICDEBUG)\errorhandler.obj": src/errorhandler.cxx $(INTDIR_STATICDEBUG)
-	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/errorhandler.cxx
-
-
 "$(INTDIR_STATICRELEASE)\except.obj": src/except.cxx $(INTDIR_STATICRELEASE)
 	$(CXX) $(CXX_FLAGS_STATICRELEASE) /Fo"$(INTDIR_STATICRELEASE)\\" /Fd"$(INTDIR_STATICRELEASE)\\" src/except.cxx
 
 "$(INTDIR_STATICDEBUG)\except.obj": src/except.cxx $(INTDIR_STATICDEBUG)
 	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/except.cxx
-
-
-"$(INTDIR_STATICRELEASE)\field.obj": src/field.cxx $(INTDIR_STATICRELEASE)
-	$(CXX) $(CXX_FLAGS_STATICRELEASE) /Fo"$(INTDIR_STATICRELEASE)\\" /Fd"$(INTDIR_STATICRELEASE)\\" src/field.cxx
-
-"$(INTDIR_STATICDEBUG)\field.obj": src/field.cxx $(INTDIR_STATICDEBUG)
-	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/field.cxx
 
 
 "$(INTDIR_STATICRELEASE)\largeobject.obj": src/largeobject.cxx $(INTDIR_STATICRELEASE)
@@ -380,13 +346,6 @@ $(INTDIR_DLLRELEASE):
 
 "$(INTDIR_STATICDEBUG)\nontransaction.obj": src/nontransaction.cxx $(INTDIR_STATICDEBUG)
 	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/nontransaction.cxx
-
-
-"$(INTDIR_STATICRELEASE)\notification.obj": src/notification.cxx $(INTDIR_STATICRELEASE)
-	$(CXX) $(CXX_FLAGS_STATICRELEASE) /Fo"$(INTDIR_STATICRELEASE)\\" /Fd"$(INTDIR_STATICRELEASE)\\" src/notification.cxx
-
-"$(INTDIR_STATICDEBUG)\notification.obj": src/notification.cxx $(INTDIR_STATICDEBUG)
-	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/notification.cxx
 
 
 "$(INTDIR_STATICRELEASE)\notify-listen.obj": src/notify-listen.cxx $(INTDIR_STATICRELEASE)
@@ -480,13 +439,6 @@ $(INTDIR_DLLRELEASE):
 	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/transaction_base.cxx
 
 
-"$(INTDIR_STATICRELEASE)\tuple.obj": src/tuple.cxx $(INTDIR_STATICRELEASE)
-	$(CXX) $(CXX_FLAGS_STATICRELEASE) /Fo"$(INTDIR_STATICRELEASE)\\" /Fd"$(INTDIR_STATICRELEASE)\\" src/tuple.cxx
-
-"$(INTDIR_STATICDEBUG)\tuple.obj": src/tuple.cxx $(INTDIR_STATICDEBUG)
-	$(CXX) $(CXX_FLAGS_STATICDEBUG) /Fo"$(INTDIR_STATICDEBUG)\\" /Fd"$(INTDIR_STATICDEBUG)\\" src/tuple.cxx
-
-
 "$(INTDIR_STATICRELEASE)\util.obj": src/util.cxx $(INTDIR_STATICRELEASE)
 	$(CXX) $(CXX_FLAGS_STATICRELEASE) /Fo"$(INTDIR_STATICRELEASE)\\" /Fd"$(INTDIR_STATICRELEASE)\\" src/util.cxx
 
@@ -531,25 +483,11 @@ $(INTDIR_DLLRELEASE):
 	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/dbtransaction.cxx
 
 
-"$(INTDIR_DLLRELEASE)\errorhandler.obj": src/errorhandler.cxx $(INTDIR_DLLRELEASE)
-	$(CXX) $(CXX_FLAGS_DLLRELEASE) /Fo"$(INTDIR_DLLRELEASE)\\" /Fd"$(INTDIR_DLLRELEASE)\\" src/errorhandler.cxx
-
-"$(INTDIR_DLLDEBUG)\errorhandler.obj": src/errorhandler.cxx $(INTDIR_DLLDEBUG)
-	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/errorhandler.cxx
-
-
 "$(INTDIR_DLLRELEASE)\except.obj": src/except.cxx $(INTDIR_DLLRELEASE)
 	$(CXX) $(CXX_FLAGS_DLLRELEASE) /Fo"$(INTDIR_DLLRELEASE)\\" /Fd"$(INTDIR_DLLRELEASE)\\" src/except.cxx
 
 "$(INTDIR_DLLDEBUG)\except.obj": src/except.cxx $(INTDIR_DLLDEBUG)
 	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/except.cxx
-
-
-"$(INTDIR_DLLRELEASE)\field.obj": src/field.cxx $(INTDIR_DLLRELEASE)
-	$(CXX) $(CXX_FLAGS_DLLRELEASE) /Fo"$(INTDIR_DLLRELEASE)\\" /Fd"$(INTDIR_DLLRELEASE)\\" src/field.cxx
-
-"$(INTDIR_DLLDEBUG)\field.obj": src/field.cxx $(INTDIR_DLLDEBUG)
-	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/field.cxx
 
 
 "$(INTDIR_DLLRELEASE)\largeobject.obj": src/largeobject.cxx $(INTDIR_DLLRELEASE)
@@ -564,13 +502,6 @@ $(INTDIR_DLLRELEASE):
 
 "$(INTDIR_DLLDEBUG)\nontransaction.obj": src/nontransaction.cxx $(INTDIR_DLLDEBUG)
 	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/nontransaction.cxx
-
-
-"$(INTDIR_DLLRELEASE)\notification.obj": src/notification.cxx $(INTDIR_DLLRELEASE)
-	$(CXX) $(CXX_FLAGS_DLLRELEASE) /Fo"$(INTDIR_DLLRELEASE)\\" /Fd"$(INTDIR_DLLRELEASE)\\" src/notification.cxx
-
-"$(INTDIR_DLLDEBUG)\notification.obj": src/notification.cxx $(INTDIR_DLLDEBUG)
-	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/notification.cxx
 
 
 "$(INTDIR_DLLRELEASE)\notify-listen.obj": src/notify-listen.cxx $(INTDIR_DLLRELEASE)
@@ -662,13 +593,6 @@ $(INTDIR_DLLRELEASE):
 
 "$(INTDIR_DLLDEBUG)\transaction_base.obj": src/transaction_base.cxx $(INTDIR_DLLDEBUG)
 	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/transaction_base.cxx
-
-
-"$(INTDIR_DLLRELEASE)\tuple.obj": src/tuple.cxx $(INTDIR_DLLRELEASE)
-	$(CXX) $(CXX_FLAGS_DLLRELEASE) /Fo"$(INTDIR_DLLRELEASE)\\" /Fd"$(INTDIR_DLLRELEASE)\\" src/tuple.cxx
-
-"$(INTDIR_DLLDEBUG)\tuple.obj": src/tuple.cxx $(INTDIR_DLLDEBUG)
-	$(CXX) $(CXX_FLAGS_DLLDEBUG) /Fo"$(INTDIR_DLLDEBUG)\\" /Fd"$(INTDIR_DLLDEBUG)\\" src/tuple.cxx
 
 
 "$(INTDIR_DLLRELEASE)\util.obj": src/util.cxx $(INTDIR_DLLRELEASE)

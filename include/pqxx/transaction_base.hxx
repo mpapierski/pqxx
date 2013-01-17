@@ -9,7 +9,7 @@
  *   represents a database transaction
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/transaction_base instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -61,9 +61,9 @@ public:
 
 protected:
   void register_me();
-  void unregister_me() PQXX_NOEXCEPT;
-  void reg_pending_error(const PGSTD::string &) PQXX_NOEXCEPT;
-  bool registered() const PQXX_NOEXCEPT { return m_registered; }
+  void unregister_me() throw ();
+  void reg_pending_error(const PGSTD::string &) throw ();
+  bool registered() const throw () { return m_registered; }
 
   transaction_base &m_Trans;
 
@@ -85,12 +85,8 @@ public:
   parameterized_invocation(connection_base &, const PGSTD::string &query);
 
   parameterized_invocation &operator()() { add_param(); return *this; }
-  parameterized_invocation &operator()(const binarystring &v)
-	{ add_binary_param(v, true); return *this; }
   template<typename T> parameterized_invocation &operator()(const T &v)
-	{ add_param(v, true); return *this; }
-  parameterized_invocation &operator()(const binarystring &v, bool nonnull)
-	{ add_binary_param(v, nonnull); return *this; }
+	{ add_param(v); return *this; }
   template<typename T>
 	parameterized_invocation &operator()(const T &v, bool nonnull)
 	{ add_param(v, nonnull); return *this; }
@@ -165,12 +161,14 @@ public:
    */
   //@{
   /// Escape string for use as SQL string literal in this transaction
-  PGSTD::string esc(const char str[]) const          { return conn().esc(str); }
+  PGSTD::string esc(const char str[]) const				//[t90]
+                                                     { return m_Conn.esc(str); }
   /// Escape string for use as SQL string literal in this transaction
-  PGSTD::string esc(const char str[], size_t maxlen) const
-                                             { return conn().esc(str, maxlen); }
+  PGSTD::string esc(const char str[], size_t maxlen) const		//[t90]
+                                             { return m_Conn.esc(str, maxlen); }
   /// Escape string for use as SQL string literal in this transaction
-  PGSTD::string esc(const PGSTD::string &str) const  { return conn().esc(str); }
+  PGSTD::string esc(const PGSTD::string &str) const			//[t90]
+                                                     { return m_Conn.esc(str); }
 
   /// Escape binary data for use as SQL string literal in this transaction
   /** Raw, binary data is treated differently from regular strings.  Binary
@@ -185,24 +183,14 @@ public:
    * special escape sequences.
    */
   PGSTD::string esc_raw(const unsigned char str[], size_t len) const	//[t62]
-                                            { return conn().esc_raw(str, len); }
+                                            { return m_Conn.esc_raw(str, len); }
   /// Escape binary data for use as SQL string literal in this transaction
   PGSTD::string esc_raw(const PGSTD::string &) const;			//[t62]
 
   /// Represent object as SQL string, including quoting & escaping.
   /** Nulls are recognized and represented as SQL nulls. */
   template<typename T> PGSTD::string quote(const T &t) const
-                                                     { return conn().quote(t); }
-
-  /// Binary-escape and quote a binarystring for use as an SQL constant.
-  PGSTD::string quote_raw(const unsigned char str[], size_t len) const
-					  { return conn().quote_raw(str, len); }
-
-  PGSTD::string quote_raw(const PGSTD::string &str) const;
-
-  /// Escape an SQL identifier for use in a query.
-  PGSTD::string quote_name(const PGSTD::string &identifier) const
-				       { return conn().quote_name(identifier); }
+                                                     { return m_Conn.quote(t); }
   //@}
 
   /// Execute query
@@ -225,7 +213,7 @@ public:
 	      const PGSTD::string &Desc=PGSTD::string());		//[t1]
 
   result exec(const PGSTD::stringstream &Query,
-	      const PGSTD::string &Desc=PGSTD::string())
+	      const PGSTD::string &Desc=PGSTD::string())		//[t9]
 	{ return exec(Query.str(), Desc); }
 
   /// Parameterize a statement.
@@ -344,7 +332,7 @@ protected:
   void Begin();
 
   /// End transaction.  To be called by implementing class' destructor
-  void End() PQXX_NOEXCEPT;
+  void End() throw ();
 
   /// To be implemented by derived implementation class: start transaction
   virtual void do_begin() =0;
@@ -369,7 +357,7 @@ protected:
   result DirectExec(const char C[], int Retries=0);
 
   /// Forget about any reactivation-blocking resources we tried to allocate
-  void reactivation_avoidance_clear() PQXX_NOEXCEPT
+  void reactivation_avoidance_clear() throw ()
 	{m_reactivation_avoidance.clear();}
 
 protected:
@@ -412,15 +400,13 @@ private:
 
   void PQXX_PRIVATE CheckPendingError();
 
-  template<typename T> bool parm_is_null(T *p) const PQXX_NOEXCEPT
-	{ return !p; }
-  template<typename T> bool parm_is_null(T) const PQXX_NOEXCEPT
-	{ return false; }
+  template<typename T> bool parm_is_null(T *p) const throw () { return !p; }
+  template<typename T> bool parm_is_null(T) const throw () { return false; }
 
   friend class pqxx::internal::gate::transaction_transactionfocus;
   void PQXX_PRIVATE RegisterFocus(internal::transactionfocus *);
-  void PQXX_PRIVATE UnregisterFocus(internal::transactionfocus *) PQXX_NOEXCEPT;
-  void PQXX_PRIVATE RegisterPendingError(const PGSTD::string &) PQXX_NOEXCEPT;
+  void PQXX_PRIVATE UnregisterFocus(internal::transactionfocus *) throw ();
+  void PQXX_PRIVATE RegisterPendingError(const PGSTD::string &) throw ();
 
   friend class pqxx::internal::gate::transaction_tablereader;
   void PQXX_PRIVATE BeginCopyRead(const PGSTD::string &, const PGSTD::string &);

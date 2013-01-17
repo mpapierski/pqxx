@@ -221,12 +221,6 @@ nodist_noinst_HEADERS = \
 	config-internal-compiler.h \
 	config-internal-libpq.h
 
-DISTCLEANFILES = \
-	config-internal-autotools.h \
-	config-internal-compiler.h \
-	config-internal-libpq.h \
-	config-public-compiler.h
-
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -395,7 +389,6 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
-	-test -z "$(DISTCLEANFILES)" || rm -f $(DISTCLEANFILES)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"

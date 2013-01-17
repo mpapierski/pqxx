@@ -4,10 +4,10 @@
  *	pqxx/binarystring.hxx
  *
  *   DESCRIPTION
- *      Representation for raw, binary data.
+ *      declarations for bytea (binary string) conversions
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/binarystring instead.
  *
- * Copyright (c) 2003-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2003-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -29,16 +29,17 @@
 namespace pqxx
 {
 
-/// Binary data corresponding to PostgreSQL's "BYTEA" binary-string type.
+/// Reveals "unescaped" version of PostgreSQL bytea string
 /** @addtogroup escaping String escaping
  *
- * This class represents a binary string as stored in a field of type bytea.
- * The raw value returned by a bytea field contains escape sequences for certain
- * characters, which are filtered out by binarystring.
+ * This class represents a postgres-internal buffer containing the original,
+ * binary string represented by a field of type bytea.  The raw value returned
+ * by such a field contains escape sequences for certain characters, which are
+ * filtered out by binarystring.
  *
- * Internally a binarystring is zero-terminated, but it may also contain zero
- * bytes, just like any other byte value.  So don't assume that it can be
- * treated as a C-style string unless you've made sure of this yourself.
+ * The resulting string is zero-terminated, but may also contain zero bytes (or
+ * indeed any other byte value) so don't assume that it can be treated as a
+ * C-style string unless you've made sure of this yourself.
  *
  * The binarystring retains its value even if the result it was obtained from is
  * destroyed, but it cannot be copied or assigned.
@@ -56,11 +57,9 @@ namespace pqxx
  * is protected against concurrency with similar operations on the same object,
  * or other objects pointing to the same data block.
  */
-class PQXX_LIBEXPORT binarystring :
-	internal::PQAlloc<
-		unsigned char,
-		pqxx::internal::freemallocmem_templated<unsigned char> >
+class PQXX_LIBEXPORT binarystring : internal::PQAlloc<const unsigned char>
 {
+  // TODO: Templatize on character type?
 public:
   typedef content_type char_type;
   typedef PGSTD::char_traits<char_type>::char_type value_type;
@@ -75,36 +74,26 @@ public:
 #endif
 
 private:
-  typedef internal::PQAlloc<
-	value_type,
-	pqxx::internal::freemallocmem_templated<unsigned char> >
-    super;
+  typedef internal::PQAlloc<value_type> super;
 
 public:
   /// Read and unescape bytea field
   /** The field will be zero-terminated, even if the original bytea field isn't.
    * @param F the field to read; must be a bytea field
    */
-  explicit binarystring(const field &);					//[t62]
-
-  /// Copy binary data from std::string.
-  explicit binarystring(const PGSTD::string &);
-
-  /// Copy binary data of given length straight out of memory.
-  binarystring(const void *, size_t);
+  explicit binarystring(const result::field &F);			//[t62]
 
   /// Size of converted string in bytes
-  size_type size() const PQXX_NOEXCEPT { return m_size; }		//[t62]
+  size_type size() const throw () { return m_size; }			//[t62]
   /// Size of converted string in bytes
-  size_type length() const PQXX_NOEXCEPT { return size(); }		//[t62]
-  bool empty() const PQXX_NOEXCEPT { return size()==0; }		//[t62]
+  size_type length() const throw () { return size(); }			//[t62]
+  bool empty() const throw () { return size()==0; }			//[t62]
 
-  const_iterator begin() const PQXX_NOEXCEPT { return data(); }		//[t62]
-  const_iterator end() const PQXX_NOEXCEPT { return data()+m_size; }	//[t62]
+  const_iterator begin() const throw () { return data(); }		//[t62]
+  const_iterator end() const throw () { return data()+m_size; }		//[t62]
 
-  const_reference front() const PQXX_NOEXCEPT { return *begin(); }	//[t62]
-  const_reference back() const PQXX_NOEXCEPT				//[t62]
-	{ return *(data()+m_size-1); }
+  const_reference front() const throw () { return *begin(); }		//[t62]
+  const_reference back() const throw () { return *(data()+m_size-1); }	//[t62]
 
 #ifdef PQXX_HAVE_REVERSE_ITERATOR
   const_reverse_iterator rbegin() const					//[t62]
@@ -114,13 +103,13 @@ public:
 #endif
 
   /// Unescaped field contents
-  const value_type *data() const PQXX_NOEXCEPT {return super::get();}	//[t62]
+  const value_type *data() const throw () {return super::get();}	//[t62]
 
-  const_reference operator[](size_type i) const PQXX_NOEXCEPT		//[t62]
+  const_reference operator[](size_type i) const throw ()		//[t62]
 	{ return data()[i]; }
 
-  bool PQXX_PURE operator==(const binarystring &) const PQXX_NOEXCEPT;	//[t62]
-  bool operator!=(const binarystring &rhs) const PQXX_NOEXCEPT		//[t62]
+  bool operator==(const binarystring &) const throw ();			//[t62]
+  bool operator!=(const binarystring &rhs) const throw ()		//[t62]
 	{ return !operator==(rhs); }
 
   /// Index contained string, checking for valid index
@@ -133,7 +122,7 @@ public:
   /** @warning No terminating zero is added!  If the binary data did not end in
    * a null character, you will not find one here.
    */
-  const char *get() const PQXX_NOEXCEPT					//[t62]
+  const char *get() const throw ()					//[t62]
   {
     return reinterpret_cast<const char *>(super::get());
   }
@@ -163,13 +152,13 @@ private:
  * @deprecated Use the transaction's esc_raw() functions instead
  * \relatesalso binarystring
  */
-PGSTD::string PQXX_LIBEXPORT PQXX_DEPRECATED escape_binary(const PGSTD::string &bin);
+PGSTD::string PQXX_LIBEXPORT escape_binary(const PGSTD::string &bin);
 /// Escape binary string for inclusion in SQL
 /**
  * @deprecated Use the transaction's esc_raw() functions instead
  * \relatesalso binarystring
  */
-PGSTD::string PQXX_LIBEXPORT PQXX_DEPRECATED escape_binary(const char bin[]);
+PGSTD::string PQXX_LIBEXPORT escape_binary(const char bin[]);
 /// Escape binary string for inclusion in SQL
 /**
  * @deprecated Use the transaction's esc_raw() functions instead
@@ -181,7 +170,7 @@ PGSTD::string PQXX_LIBEXPORT escape_binary(const char bin[], size_t len);
  * @deprecated Use the transaction's esc_raw() functions instead
  * \relatesalso binarystring
  */
-PGSTD::string PQXX_LIBEXPORT PQXX_DEPRECATED escape_binary(const unsigned char bin[]);
+PGSTD::string PQXX_LIBEXPORT escape_binary(const unsigned char bin[]);
 /// Escape binary string for inclusion in SQL
 /**
  * @deprecated Use the transaction's esc_raw() functions instead

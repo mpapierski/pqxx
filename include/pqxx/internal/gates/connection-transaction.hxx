@@ -18,7 +18,7 @@ class PQXX_PRIVATE connection_transaction : callgate<connection_base>
 	{ return home().Exec(query, retries); }
   void RegisterTransaction(transaction_base *t)
 	{ home().RegisterTransaction(t); }
-  void UnregisterTransaction(transaction_base *t) PQXX_NOEXCEPT
+  void UnregisterTransaction(transaction_base *t) throw ()
 	{ home().UnregisterTransaction(t); }
 
   bool ReadCopyLine(PGSTD::string &line)
@@ -34,19 +34,12 @@ class PQXX_PRIVATE connection_transaction : callgate<connection_base>
   void AddVariables(const PGSTD::map<PGSTD::string, PGSTD::string> &vars)
 	{ home().AddVariables(vars); }
 
-  result prepared_exec(
-	const PGSTD::string &statement,
+  result prepared_exec(const PGSTD::string &statement,
 	const char *const params[],
 	const int paramlengths[],
-	const int binaries[],
 	int nparams)
   {
-    return home().prepared_exec(
-	statement,
-	params,
-	paramlengths,
-	binaries,
-	nparams);
+    return home().prepared_exec(statement, params, paramlengths, nparams);
   }
 
   bool prepared_exists(const PGSTD::string &statement) const

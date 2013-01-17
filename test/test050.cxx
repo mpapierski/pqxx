@@ -54,21 +54,17 @@ public:
   void operator()(argument_type &T)
   {
     largeobjectaccess A(T, m_Object);
-    const largeobjectaccess::pos_type
-	orgpos = A.ctell(),
-	copyorgpos = A.ctell();
+    const cursor_base::size_type orgpos = A.ctell(), copyorgpos = A.ctell();
 
-    PQXX_CHECK_EQUAL(orgpos, 0, "Bad initial position in large object.");
+    PQXX_CHECK_EQUAL(orgpos, 0u, "Bad initial position in large object.");
     PQXX_CHECK_EQUAL(copyorgpos, orgpos, "ctell() affected positioning.");
 
-    const largeobjectaccess::pos_type cxxorgpos = A.tell();
+    const cursor_base::size_type cxxorgpos = A.tell();
     PQXX_CHECK_EQUAL(cxxorgpos, orgpos, "tell() reports bad position.");
 
     A.process_notice("Writing to large object #" +
 	to_string(largeobject(A).id()) + "\n");
-    long Bytes = A.cwrite(
-	Contents.c_str(),
-	largeobject::size_type(Contents.size()));
+    long Bytes = A.cwrite(Contents.c_str(), Contents.size());
 
     PQXX_CHECK_EQUAL(
 	Bytes,
@@ -107,7 +103,7 @@ public:
     PQXX_CHECK(size_t(A.read(Buf, Size)) <= Size, "Got too many bytes.");
 
     PQXX_CHECK_EQUAL(
-	string(Buf, string::size_type(Bytes)),
+	string(Buf, Bytes),
 	Contents,
 	"Large-object contents were mutilated.");
   }

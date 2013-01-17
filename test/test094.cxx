@@ -70,7 +70,7 @@ public:
     basic_flakytransaction(C, isolation_tag::name())
 	{ Begin(); }
 
-  virtual ~flakytransaction() PQXX_NOEXCEPT { End(); }
+  virtual ~flakytransaction() throw () { End(); }
 };
 
 
@@ -91,7 +91,7 @@ public:
     T.exec("SELECT count(*) FROM pg_tables");
   }
 
-  void on_doubt() PQXX_NOEXCEPT
+  void on_doubt() throw ()
   {
     try
     {

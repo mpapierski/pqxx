@@ -7,7 +7,7 @@
  *      Various utility definitions for libpqxx
  *      DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/util instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -177,14 +177,14 @@
  * and a tuple acts as an array of fields.
  *
  * @code
- * const int num_rows = r.size();
- * for (int rownum=0; rownum < num_rows; ++rownum)
+ * for (int rownum=0; rownum < r.size(); ++rownum)
  * {
- *   const pqxx::tuple row = r[rownum];
- *   const int num_cols = row.size();
- *   for (int colnum=0; colnum < num_cols; ++colnum)
+ *   const result::tuple row = r[rownum];
+ *
+ *   for (int colnum=0; colnum < row.size(); ++colnum)
  *   {
- *     const pqxx::field field = row[colnum];
+ *     const result::field = row[colnum];
+ *
  *     std::cout << field.c_str() << '\t';
  *   }
  *
@@ -269,7 +269,7 @@ namespace pqxx {}
  */
 namespace PGSTD {}
 
-#include <pqxx/internal/libpq-forward.hxx>
+#include <pqxx/libpq-forward.hxx>
 
 
 namespace pqxx
@@ -279,15 +279,15 @@ namespace pqxx
  */
 struct PQXX_LIBEXPORT thread_safety_model
 {
-  /// Does standard C library have a thread-safe alternative to @c strerror?
+  /// Does standard C library offer @c strerror_r?
   /** If not, its @c strerror implementation may still be thread-safe.  Check
    * your compiler's manual.
    *
-   * Without @c strerror_r (@c strerror_s in Visual C++) or a thread-safe @c
-   * strerror, the library can't safely obtain descriptions of certain run-time
-   * errors.  In that case, your application must serialize all use of libpqxx.
+   * Without @c strerror_r or a thread-safe @c strerror, the library can't
+   * safely obtain descriptions of certain run-time errors.  In that case, your
+   * application must serialize all use of libpqxx.
    */
-  bool have_safe_strerror;
+  bool have_strerror_r;
 
   /// Is the underlying libpq build thread-safe?
   /** A @c "false" here may mean one of two things: either the libpq build is
@@ -327,7 +327,7 @@ struct PQXX_LIBEXPORT thread_safety_model
 };
 
 /// Describe thread safety available in this build.
-thread_safety_model PQXX_LIBEXPORT describe_thread_safety() PQXX_NOEXCEPT;
+thread_safety_model describe_thread_safety() throw ();
 
 /// The "null" oid
 const oid oid_none = 0;
@@ -360,10 +360,10 @@ class items : public CONT
 {
 public:
   /// Create empty items list
-  items() : CONT() {}							//[t0]
+  items() : CONT() {}							//[t80]
   /// Create items list with one element
   explicit items(const T &t) : CONT() { this->push_back(t); }		//[t0]
-  items(const T &t1, const T &t2) : CONT()				//[t0]
+  items(const T &t1, const T &t2) : CONT()				//[t80]
 	{ this->push_back(t1); this->push_back(t2); }
   items(const T &t1, const T &t2, const T &t3) : CONT()			//[t0]
 	{ this->push_back(t1); this->push_back(t2); this->push_back(t3); }
@@ -386,7 +386,7 @@ public:
   items(const CONT &c) : CONT(c) {}					//[t0]
 
   /// Add element to items list
-  items &operator()(const T &t)						//[t0]
+  items &operator()(const T &t)						//[t80]
   {
     this->push_back(t);
     return *this;
@@ -439,13 +439,13 @@ PGSTD::string separated_list(const PGSTD::string &sep,			//[t0]
 
 /// Render sequence as a string, using given separator between items
 template<typename ITER> inline PGSTD::string
-separated_list(const PGSTD::string &sep, ITER begin, ITER end)		//[t0]
+separated_list(const PGSTD::string &sep, ITER begin, ITER end)		//[t8]
 	{ return separated_list(sep,begin,end,internal::dereference<ITER>()); }
 
 
 /// Render array as a string, using given separator between items
 template<typename OBJ> inline PGSTD::string
-separated_list(const PGSTD::string &sep, OBJ *begin, OBJ *end)		//[t0]
+separated_list(const PGSTD::string &sep, OBJ *begin, OBJ *end)		//[t9]
 	{ return separated_list(sep,begin,end,internal::deref_ptr<OBJ>()); }
 
 
@@ -474,16 +474,10 @@ typedef long result_difference_type;
 
 namespace internal
 {
-void PQXX_LIBEXPORT freepqmem(const void *) PQXX_NOEXCEPT;
-template<typename P> inline void freepqmem_templated(P *p) PQXX_NOEXCEPT
+void PQXX_LIBEXPORT freepqmem(const void *);
+template<typename P> inline void freepqmem_templated(P *p)
 {
   freepqmem(p);
-}
-
-void PQXX_LIBEXPORT freemallocmem(const void *) PQXX_NOEXCEPT;
-template<typename P> inline void freemallocmem_templated(P *p) PQXX_NOEXCEPT
-{
-  freemallocmem(p);
 }
 
 
@@ -491,28 +485,20 @@ template<typename P> inline void freemallocmem_templated(P *p) PQXX_NOEXCEPT
 
 /// Reference-counted smart pointer to libpq-allocated object
 template<typename T, void (*DELETER)(T *) = freepqmem_templated<T> >
-  class PQAlloc
+  class PQAlloc : protected PQXXTR1::shared_ptr<T>
 {
+  typedef PQXXTR1::shared_ptr<T> super;
 public:
   typedef T content_type;
-  PQAlloc() PQXX_NOEXCEPT : m_ptr() {}
-  PQAlloc(const PQAlloc &rhs) PQXX_NOEXCEPT : m_ptr(rhs.m_ptr) {}
-  explicit PQAlloc(T *t) : m_ptr(t, DELETER) {}
+  PQAlloc() : super() {}
+  explicit PQAlloc(T *t) : super(t, DELETER) {}
 
-  T *get() const PQXX_NOEXCEPT { return m_ptr.get(); }
-  PQAlloc &operator=(const PQAlloc &rhs) PQXX_NOEXCEPT
-  {
-    m_ptr = rhs.m_ptr;
-    return *this;
-  }
-
-  T *operator->() const PQXX_NOEXCEPT { return m_ptr.get(); }
-  T &operator*() const PQXX_NOEXCEPT { return *m_ptr; }
-  void reset() PQXX_NOEXCEPT { m_ptr.reset(); }
-  void swap(PQAlloc &other) PQXX_NOEXCEPT { m_ptr.swap(other.m_ptr); }
-
-private:
-  PQXXTR1::shared_ptr<T> m_ptr;
+  using super::get;
+  using super::operator=;
+  using super::operator->;
+  using super::operator*;
+  using super::reset;
+  using super::swap;
 };
 
 #else // !PQXX_HAVE_SHARED_PTR
@@ -528,10 +514,10 @@ public:
   ~refcount();
 
   /// Create additional reference based on existing refcount object
-  void makeref(refcount &) PQXX_NOEXCEPT;
+  void makeref(refcount &) throw ();
 
   /// Drop this reference; return whether we were the last reference
-  bool loseref() PQXX_NOEXCEPT;
+  bool loseref() throw ();
 
 private:
   /// Not allowed
@@ -545,8 +531,9 @@ private:
 /** Keep track of a libpq-allocated object, and free it once all references to
  * it have died.
  *
- * The memory is freed with @c PQfreemem() by default.  This matters on Windows,
- * where apparently under some circumstances, memory allocated by a DLL must be
+ * If the available PostgreSQL development files supply @c PQfreemem() or
+ * @c PQfreeNotify(), this is used to free the memory.  If not, free() is used
+ * instead.  This matters on Windows, where memory allocated by a DLL must be
  * freed by the same DLL.
  *
  * @warning Copying, swapping, and destroying PQAlloc objects that refer to the
@@ -563,35 +550,36 @@ class PQAlloc
 public:
   typedef T content_type;
 
-  PQAlloc() PQXX_NOEXCEPT : m_Obj(0), m_rc() {}
-  PQAlloc(const PQAlloc &rhs) PQXX_NOEXCEPT : m_Obj(0), m_rc() { makeref(rhs); }
-  ~PQAlloc() PQXX_NOEXCEPT { loseref(); }
+  PQAlloc() throw () : m_Obj(0), m_rc() {}
+  PQAlloc(const PQAlloc &rhs) throw () : m_Obj(0), m_rc() { makeref(rhs); }
+  ~PQAlloc() throw () { loseref(); }
 
-  PQAlloc &operator=(const PQAlloc &rhs) PQXX_NOEXCEPT
-	{redoref(rhs); return *this;}
+  PQAlloc &operator=(const PQAlloc &rhs) throw () {redoref(rhs); return *this;}
 
   /// Assume ownership of a pointer
   /** @warning Don't to this more than once for a given object!
    */
-  explicit PQAlloc(T *obj) PQXX_NOEXCEPT : m_Obj(obj), m_rc() {}
+  explicit PQAlloc(T *obj) throw () : m_Obj(obj), m_rc() {}
 
-  void swap(PQAlloc &rhs) PQXX_NOEXCEPT
+  void swap(PQAlloc &rhs) throw ()
   {
     PQAlloc tmp(*this);
     *this = rhs;
     rhs = tmp;
   }
 
+  //PQAlloc &operator=(T *obj) throw () { redoref(obj); return *this; }
+
   /// Is this pointer non-null?
-  operator bool() const PQXX_NOEXCEPT { return m_Obj != 0; }
+  operator bool() const throw () { return m_Obj != 0; }
 
   /// Is this pointer null?
-  bool operator!() const PQXX_NOEXCEPT { return !m_Obj; }
+  bool operator!() const throw () { return !m_Obj; }
 
   /// Dereference pointer
   /** Throws a logic_error if the pointer is null.
    */
-  T *operator->() const
+  T *operator->() const throw (PGSTD::logic_error)
   {
     if (!m_Obj) throw PGSTD::logic_error("Null pointer dereferenced");
     return m_Obj;
@@ -600,34 +588,34 @@ public:
   /// Dereference pointer
   /** Throws a logic_error if the pointer is null.
    */
-  T &operator*() const { return *operator->(); }
+  T &operator*() const throw (PGSTD::logic_error) { return *operator->(); }
 
   /// Obtain underlying pointer
   /** Ownership of the pointer's memory remains with the PQAlloc object
    */
-  T *get() const PQXX_NOEXCEPT { return m_Obj; }
+  T *get() const throw () { return m_Obj; }
 
-  void reset() PQXX_NOEXCEPT { loseref(); }
+  void reset() throw () { loseref(); }
 
 private:
-  void makeref(T *p) PQXX_NOEXCEPT { m_Obj = p; }
+  void makeref(T *p) throw () { m_Obj = p; }
 
-  void makeref(const PQAlloc &rhs) PQXX_NOEXCEPT
+  void makeref(const PQAlloc &rhs) throw ()
   {
     m_Obj = rhs.m_Obj;
     m_rc.makeref(rhs.m_rc);
   }
 
   /// Free and reset current pointer (if any)
-  void loseref() PQXX_NOEXCEPT
+  void loseref() throw ()
   {
     if (m_rc.loseref() && m_Obj) DELETER(m_Obj);
     m_Obj = 0;
   }
 
-  void redoref(const PQAlloc &rhs) PQXX_NOEXCEPT
+  void redoref(const PQAlloc &rhs) throw ()
 	{ if (rhs.m_Obj != m_Obj) { loseref(); makeref(rhs); } }
-  void redoref(T *obj) PQXX_NOEXCEPT
+  void redoref(T *obj) throw ()
 	{ if (obj != m_Obj) { loseref(); makeref(obj); } }
 };
 
@@ -646,12 +634,12 @@ public:
   explicit scoped_array(T *t) : m_ptr(t) {}
   ~scoped_array() { delete [] m_ptr; }
 
-  T *get() const PQXX_NOEXCEPT { return m_ptr; }
-  T &operator*() const PQXX_NOEXCEPT { return *m_ptr; }
-  template<typename INDEX> T &operator[](INDEX i) const PQXX_NOEXCEPT
+  T *get() const throw () { return m_ptr; }
+  T &operator*() const throw () { return *m_ptr; }
+  template<typename INDEX> T &operator[](INDEX i) const throw ()
 	{ return m_ptr[i]; }
 
-  scoped_array &operator=(T *t) PQXX_NOEXCEPT
+  scoped_array &operator=(T *t) throw ()
   {
     if (t != m_ptr)
     {
@@ -677,9 +665,8 @@ public:
   {
   }
 
-  const PGSTD::string &name() const PQXX_NOEXCEPT { return m_Name; }	//[t1]
-  const PGSTD::string &classname() const PQXX_NOEXCEPT			//[t73]
-	{return m_Classname;}
+  const PGSTD::string &name() const throw () { return m_Name; }		//[t1]
+  const PGSTD::string &classname() const throw () {return m_Classname;}	//[t73]
   PGSTD::string description() const;
 
 private:
@@ -701,7 +688,7 @@ class unique
 public:
   unique() : m_Guest(0) {}
 
-  GUEST *get() const PQXX_NOEXCEPT { return m_Guest; }
+  GUEST *get() const throw () { return m_Guest; }
 
   void Register(GUEST *G)
   {
@@ -734,35 +721,21 @@ void PQXX_LIBEXPORT sleep_seconds(int);
 typedef const char *cstring;
 
 /// Human-readable description for error code, possibly using given buffer
-/** Wrapper for @c strerror() or thread-safe variant, as available.  The
- * default code copies the string to the provided buffer, but this may not
- * always be necessary.  The result is guaranteed to remain usable for as long
- * as the given buffer does.
+/** Wrapper for @c strerror() or @c strerror_r(), as available.  The normal case
+ * is to copy the string to the provided buffer, but this may not always be the
+ * case.  The result is guaranteed to remain usable for as long as the given
+ * buffer does.
  * @param err system error code as copied from errno
  * @param buf caller-provided buffer for message to be stored in, if needed
  * @param len usable size (in bytes) of provided buffer
  * @return human-readable error string, which may or may not reside in buf
  */
 cstring PQXX_LIBEXPORT strerror_wrapper(int err, char buf[], PGSTD::size_t len)
-  PQXX_NOEXCEPT;
+  throw ();
 
 
 /// Commonly used SQL commands
 extern const char sql_begin_work[], sql_commit_work[], sql_rollback_work[];
-
-
-/// Wrapper for std::distance; not all platforms have std::distance().
-template<typename T> inline PGSTD::ptrdiff_t distance(T first, T last)
-{
-#ifdef PQXX_HAVE_DISTANCE
-  return PGSTD::distance(first, last);
-#else
-  // Naive implementation.  All we really need for now.
-  PGSTD::ptrdiff_t d;
-  for (d=0; first != last; ++d) ++first;
-  return d;
-#endif
-}
 
 } // namespace internal
 } // namespace pqxx

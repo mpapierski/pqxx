@@ -11,16 +11,16 @@
 LC_ALL=C
 
 AC_PREREQ(2.59)
-AC_INIT(libpqxx, 5.0, [Jeroen T. Vermeulen <jtv@xs4all.nl>])
+AC_INIT(libpqxx, 3.1.1, [Jeroen T. Vermeulen <jtv@xs4all.nl>])
 AC_LANG(C++)
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config/m4])
-AM_INIT_AUTOMAKE(libpqxx, 5.0)
+AM_INIT_AUTOMAKE(libpqxx, 3.1.1)
 
-PQXXVERSION=5.0
-PQXX_ABI=5.0
-PQXX_MAJOR=5
-PQXX_MINOR=0
+PQXXVERSION=3.1.1
+PQXX_ABI=3.1
+PQXX_MAJOR=3
+PQXX_MINOR=1
 AC_SUBST(PQXXVERSION)
 AC_SUBST(PQXX_ABI)
 AC_SUBST(PQXX_MAJOR)
@@ -40,25 +40,12 @@ AC_DISABLE_SHARED
 AC_PROG_LIBTOOL
 AC_PROG_MAKE_SET
 AC_PATH_PROG([MKDIR], [mkdir])
-AC_PATH_PROG([PKG_CONFIG], [pkg-config])
-
-# Documentation.
-AC_ARG_ENABLE(
-	documentation,
-	[AS_HELP_STRING([--enable-documentation], [Generate documentation])],
-	[],
-	[enable_documentation=yes])
-if test "$enable_documentation" = "yes"
-then
 AC_PATH_PROG([DOXYGEN], [doxygen])
-AM_CONDITIONAL([BUILD_REFERENCE], [/bin/true])
+AM_CONDITIONAL([BUILD_REFERENCE], [test -n "$DOXYGEN"])
 AC_CHECK_PROG(HAVE_DOT, dot, YES, NO)
 AC_PATH_PROG([XMLTO], [xmlto])
-AM_CONDITIONAL([BUILD_TUTORIAL], [/bin/true])
-else
-AM_CONDITIONAL(BUILD_REFERENCE, [/bin/false])
-AM_CONDITIONAL(BUILD_TUTORIAL, [/bin/false])
-fi
+AC_PATH_PROG([PKG_CONFIG], [pkg-config])
+AM_CONDITIONAL([BUILD_TUTORIAL], [test -n "$XMLTO"])
 
 
 AM_MAINTAINER_MODE
@@ -98,9 +85,7 @@ if test "$GCC" = "yes" ; then
 		add_compiler_opts \
 			-Werror \
 			-Wno-div-by-zero \
-			-fnothrow-opt \
 			-ffor-scope \
-			-fstrict-enums \
 			-fstrict-aliasing \
 			-Wstrict-aliasing \
 			-funit-at-a-time \
@@ -118,9 +103,11 @@ if test "$GCC" = "yes" ; then
 			-Wcast-align  \
 			-Wconversion \
 			-Wctor-dtor-privacy \
+			-Wc++-compat \
 			-Wendif-labels \
 			-Wlogical-op \
 			-Woverlength-strings \
+			-Wpointer-sign \
 			-Wredundant-decls \
 			-Wsign-compare \
 			-Wwrite-strings  \
@@ -131,11 +118,13 @@ if test "$GCC" = "yes" ; then
 			-Wsign-promo \
 			-Wstrict-null-sentinel \
 			-Wformat-security \
+			-Wnonnull \
 			-Winit-self \
 			-Wswitch \
 			-Wmissing-field-initializers \
 			-Wmissing-include-dirs \
-			-Wunused
+			-Wunused \
+			-funit-at-a-time
 	fi
 
 	if test "$enable_long_long" = "yes" ; then
@@ -164,45 +153,14 @@ AC_MSG_RESULT($gcc_visibility)
 	fi
 CXXFLAGS="$SAVE_CXXFLAGS"
 
-AC_MSG_CHECKING([g++ const attribute])
-gcc_const_attr=yes
-AC_TRY_COMPILE([void __attribute__ ((const)) f();],
-	[],
-	AC_DEFINE([PQXX_HAVE_GCC_CONST], 1,
-		[Define if g++ supports const attribute]),
-	gcc_const_attr=yes)
-AC_MSG_RESULT($gcc_const_attr)
-
 AC_MSG_CHECKING([g++ deprecation attribute])
 gcc_deprecated=yes
-AC_TRY_COMPILE([void __attribute__ ((deprecated)) f();],
+AC_TRY_COMPILE([void f() __attribute__ ((deprecated));],
 	[],
 	AC_DEFINE([PQXX_HAVE_GCC_DEPRECATED],1,
 		[Define if g++ supports deprecated attribute, as in g++ 4.0]),
 	gcc_deprecated=no)
 AC_MSG_RESULT($gcc_deprecated)
-
-AC_MSG_CHECKING([g++ noreturn attribute])
-gcc_noreturn=yes
-# Needs a throw spec and a definition in order to trip up a bug in clang++ 2.8.
-# It'll claim the throw spec is missing on the definition.
-AC_TRY_COMPILE([
-	void __attribute__ ((noreturn)) f() throw (int);
-        void f()throw(int){throw 1;}
-	], [],
-	AC_DEFINE([PQXX_HAVE_GCC_NORETURN],1,
-		[Define if g++ supports noreturn attribute]),
-	gcc_noreturn=no)
-AC_MSG_RESULT($gcc_noreturn)
-
-AC_MSG_CHECKING([g++ pure attribute])
-gcc_pure=yes
-AC_TRY_COMPILE([void __attribute__ ((pure)) f();],
-	[],
-	AC_DEFINE([PQXX_HAVE_GCC_PURE], 1,
-		[Define if g++ supports pure attribute]),
-	gcc_pure=yes)
-AC_MSG_RESULT($gcc_pure)
 
 fi
 
@@ -237,23 +195,11 @@ AC_DEFINE_UNQUOTED(
 	[name of standard library namespace (normally "std")])
 if ! test -z "${std}" ; then
 	AC_MSG_RESULT([::${std}])
-	usestd="namespace ${std} {} using namespace ${std};"
+	usestd="using namespace ${std};"
 else
 	AC_MSG_RESULT([::])
 fi
 
-
-AC_MSG_CHECKING([for noexcept support])
-noexcept_keyword=yes
-AC_TRY_COMPILE(
-	[void foo() noexcept {}],
-	[],
-	AC_DEFINE(
-		[PQXX_HAVE_NOEXCEPT],
-		1,
-		[Define if the compiler supports the noexcept keyword.]),
-	noexcept_keyword=no)
-AC_MSG_RESULT($noexcept_keyword)
 
 boost_smart_ptr=yes
 AC_CHECK_HEADER(boost/smart_ptr.hpp, AC_DEFINE(PQXX_HAVE_BOOST_SMART_PTR, 1,
@@ -471,7 +417,7 @@ A source file using the PQexec() function did compile without problems, and the
 libpq library is available for linking, but for some reason a call to PQexec()
 failed to link properly to the libpq library.  This may be because the libpq
 library file is damaged, or in some incorrect format. or if your libpq is much
-more recent than libpqxx version 5.0, perhaps libpq has undergone a
+more recent than libpqxx version 3.1.1, perhaps libpq has undergone a
 radical ABI change.
 
 The last parts of config.log may give you a clue as to what really went wrong,
@@ -526,7 +472,7 @@ AC_MSG_RESULT(yes)
 
 AC_MSG_CHECKING([that type of libpq's Oid is as expected])
 AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>
-	#include"${srcdir}/include/pqxx/internal/libpq-forward.hxx"
+	#include"${srcdir}/include/pqxx/libpq-forward.hxx"
 	extern void f(pqxx::oid&);],
 	[Oid o;f(o)],
 	[],
@@ -752,52 +698,168 @@ AC_TRY_COMPILE(
 	[pqisthreadsafe=no])
 AC_MSG_RESULT($pqisthreadsafe)
 
-AC_MSG_CHECKING([PQescapeLiteral()])
-pqescapeliteral=yes
+AC_MSG_CHECKING([PQserverVersion()])
+pqserverversion=yes
 AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
-	[PQescapeLiteral(0,"x",1)],
-	AC_DEFINE(PQXX_HAVE_PQESCAPELITERAL, 1,
-		[Define if libpq has PQescapeLiteral()]),
-	[pqescapeliteral=no]
+	[PQserverVersion(0)],
+	AC_DEFINE(PQXX_HAVE_PQSERVERVERSION, 1,
+		[Define if libpq has PQserverVersion()]),
+	[pqserverversion=no]
 )
-AC_MSG_RESULT($pqescapeliteral)
+AC_MSG_RESULT($pqserverversion)
 
-
-AC_MSG_CHECKING([support for hex binary escaping format])
-	pqunescapebytea_9=yes
-	AC_RUN_IFELSE([
-#include<stdio.h>
-#include<${with_postgres_include}/libpq-fe.h>
-int main()
-{
-  typedef unsigned char *ucharptr;
-  size_t sz = 0;
-  /* Pre-9.0 octal escaping will unescape this as "x20". */
-  const unsigned char *foo;
-  foo = PQunescapeBytea(ucharptr("\\\\x20"), &sz);
-  return *foo != 0x20;
-}
-],
-		AC_DEFINE(PQXX_HAVE_PQUNESCAPEBYTEA_9, 1,
-[Define if PQunescapeBytea() supports hex escape format]),
-		pqunescapebytea_9=no,
-		pqunescapebytea_9=no)
-AC_MSG_RESULT($pqunescapebytea_9)
-
-
-AC_MSG_CHECKING([PQescapeIdentifier()])
-pqescapeidentifier=yes
-AC_TRY_COMPILE(
-	[#include<${with_postgres_include}/libpq-fe.h>],
-	[PQescapeIdentifier(NULL, "foo", 3)],
-	AC_DEFINE(
-		PQXX_HAVE_PQESCAPEIDENTIFIER,
-		1,
-		[Define if libpq has PQescapeIdentifier()]),
-	[pqescapeidentifier=no]
+AC_MSG_CHECKING([PQprotocolVersion()])
+pqprotocolversion=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PQprotocolVersion(0)],
+	AC_DEFINE(PQXX_HAVE_PQPROTOCOLVERSION, 1,
+		[Define if libpq has PQprotocolVersion()]),
+	[pqprotocolversion=no]
 )
-AC_MSG_RESULT(pqescapeidentifier)
+AC_MSG_RESULT($pqprotocolversion)
 
+
+AC_MSG_CHECKING([PQescapeString()])
+pqescapestring=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[char c[1];PQescapeString(c,"",0x01)],
+	AC_DEFINE(PQXX_HAVE_PQESCAPESTRING, 1,
+		[Define if libpq has PQescapeString()]),
+	[pqescapestring=no]
+)
+AC_MSG_RESULT($pqescapestring)
+if test "$pqescapestring" != yes ; then
+	AC_MSG_WARN([
+You appear to be building with a very old libpq version that does not have
+PQescapeString().  This can cause serious problems when non-ASCII data is used
+in SQL strings.
+Please consider upgrading to at least the libpq that came with PostgreSQL 7.2
+before going any further!
+])
+fi
+
+AC_MSG_CHECKING([PQescapeStringConn()])
+pqescapestringconn=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[char b[1];PQescapeStringConn(0,b,b,sizeof(b),0)],
+	AC_DEFINE(PQXX_HAVE_PQESCAPESTRINGCONN, 1,
+		[Define if libpq has PQescapeStringConn()]),
+	[pqescapestringconn=no]
+)
+AC_MSG_RESULT($pqescapestringconn)
+
+AC_MSG_CHECKING([PQescapeBytea()])
+pqescapebytea=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>
+#include<cstddef>
+${usestd}],
+	[size_t l=0;const unsigned char c[]="";PQescapeBytea(c,1,&l)],
+	AC_DEFINE(PQXX_HAVE_PQESCAPEBYTEA,1,[Define if libpq has PQescapeBytea()]),
+	[pqescapebytea=no]
+)
+AC_MSG_RESULT($pqescapebytea)
+
+AC_MSG_CHECKING([PQescapeByteaConn()])
+pqescapebyteaconn=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>
+#include<cstddef>
+${usestd}],
+	[unsigned char b[1];size_t c;PQescapeByteaConn(0,b,sizeof(b),&c)],
+	AC_DEFINE(PQXX_HAVE_PQESCAPEBYTEACONN,1,[Define if libpq has PQescapeByteaConn()]),
+	[pqescapebyteaconn=no]
+)
+AC_MSG_RESULT($pqescapebyteaconn)
+
+AC_MSG_CHECKING([PQunescapeBytea()])
+pqunescapebytea=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>
+	${usestd}],
+	[size_t l=0;const unsigned char c[]="";PQunescapeBytea(c,&l)],
+	AC_DEFINE(PQXX_HAVE_PQUNESCAPEBYTEA,1,[Define if libpq has PQunescapeBytea()]),
+	[pqunescapebytea=no]
+)
+AC_MSG_RESULT($pqunescapebytea)
+
+AC_MSG_CHECKING([PQfreemem()])
+pqfreemem=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[char c='x';PQfreemem(&c)],
+	AC_DEFINE(PQXX_HAVE_PQFREEMEM,1,[Define if libpq has PQfreemem()]),
+	[pqfreemem=no]
+)
+AC_MSG_RESULT($pqfreemem)
+
+AC_MSG_CHECKING([PQfreeNotify()])
+pqfreenotify=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[char c='x';PQfreeNotify(&c)],
+	AC_DEFINE(PQXX_HAVE_PQFREENOTIFY,1,[Define if libpq has PQfreeNotify()]),
+	[pqfreenotify=no]
+)
+AC_MSG_RESULT($pqfreenotify)
+
+AC_MSG_CHECKING([PQftable()])
+pqftable=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PGresult*r=0;PQftable(r,0)],
+	AC_DEFINE(PQXX_HAVE_PQFTABLE,1,[Define if libpq has PQftable()]),
+	[pqftable=no]
+)
+AC_MSG_RESULT($pqftable)
+
+AC_MSG_CHECKING([PQftablecol()])
+pqftablecol=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PGresult*r=0;PQftablecol(r,0)],
+	AC_DEFINE(PQXX_HAVE_PQFTABLECOL,1,[Define if libpq has PQftablecol()]),
+	[pqftablecol=no]
+)
+AC_MSG_RESULT($pqftablecol)
+
+AC_MSG_CHECKING([for new COPY functions])
+pqputcopy=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PGconn*c=0;PQputCopyData(c,"",0)],
+	AC_DEFINE(PQXX_HAVE_PQPUTCOPY,1,[Define if libpq has PQputCopyData() and related functions]),
+	[pqputcopy=no]
+)
+AC_MSG_RESULT($pqputcopy)
+
+AC_MSG_CHECKING([PQprepare()])
+pqprepare=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[extern PGconn*c;Oid o;PQprepare(c,"","",0,&o)],
+	AC_DEFINE(PQXX_HAVE_PQPREPARE,1,[Define if libpq has PQprepare()]),
+	[pqprepare=no]
+)
+AC_MSG_RESULT($pqprepare)
+
+AC_MSG_CHECKING([PQexecPrepared()])
+pqexecprepared=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PGconn*c=0;const char*p[1]={0};const int i=0;PQexecPrepared(c,"",i,p,&i,&i,i)],
+	AC_DEFINE(PQXX_HAVE_PQEXECPREPARED,1,[Define if libpq has PQexecPrepared()]),
+	[pqexecprepared=no]
+)
+AC_MSG_RESULT($pqexecprepared)
+
+AC_MSG_CHECKING([PQexecParams()])
+pqexecparams=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PQexecParams(0, "", 0, 0, 0, 0, 0, 0)],
+	AC_DEFINE(PQXX_HAVE_PQEXECPARAMS,1,[Define if libpq has PQexecParams()]),
+	[pqexecparams=no]
+)
+AC_MSG_RESULT($pqexecparams)
+
+AC_MSG_CHECKING([PQresultErrorField()])
+pqresulterrorfield=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[PGresult*r=0;PQresultErrorField(r,PG_DIAG_STATEMENT_POSITION)],
+	AC_DEFINE(PQXX_HAVE_PQRESULTERRORFIELD,1,[Define if libpq has PQresultErrorField() and PG_DIAG_STATEMENT_POSITION]),
+	[pqresulterrorfield=no]
+)
+AC_MSG_RESULT($pqresulterrorfield)
 
 AC_MSG_CHECKING([PQencryptPassword()])
 pqencryptpassword=yes
@@ -807,6 +869,16 @@ AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
 	[pqencryptpassword=no]
 )
 AC_MSG_RESULT($pqencryptpassword)
+
+
+AC_MSG_CHECKING([PQclientEncoding()])
+pqclientencoding=yes
+AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
+	[return PQclientEncoding(NULL)],
+	AC_DEFINE(PQXX_HAVE_PQCLIENTENCODING,1,[Define if libpq has PQclientEncoding()]),
+	[pqclientencoding=no]
+)
+AC_MSG_RESULT($pqclientencoding)
 
 
 AC_MSG_CHECKING([PQmblen()])
@@ -828,15 +900,6 @@ AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
 )
 AC_MSG_RESULT($pqdescribeportal)
 
-AC_MSG_CHECKING([PQclientEncoding()])
-pqclientencoding=yes
-AC_TRY_COMPILE([#include<${with_postgres_include}/libpq-fe.h>],
-	[PQclientEncoding(0)],
-	AC_DEFINE(PQXX_HAVE_PQCLIENTENCODING, 1,
-		[Define if libpq has PQclientEncoding()]),
-	[pqclientencoding=no]
-)
-AC_MSG_RESULT($pqclientencoding)
 
 AC_MSG_CHECKING([PQcancel()])
 pqcancel=yes
@@ -963,19 +1026,6 @@ AC_TRY_COMPILE([#include <iterator>
 	[reverseit='no'])
 AC_MSG_RESULT($reverseit)
 
-AC_MSG_CHECKING([for auto_ptr])
-auto_ptr='yes'
-AC_TRY_COMPILE([
-	#include <memory>
-	${usestd}
-        int *get_ptr();],
-	[auto_ptr<int> i(get_ptr())],
-	[AC_DEFINE(PQXX_HAVE_AUTO_PTR,
-		1,
-		[Define if compiler has auto_ptr])],
-	[auto_ptr='no'])
-AC_MSG_RESULT($auto_ptr)
-
 AC_MSG_CHECKING([for tr1::shared_ptr])
 sharedptr='yes'
 AC_TRY_COMPILE([#include <${tr1dir}memory>],
@@ -985,32 +1035,6 @@ AC_TRY_COMPILE([#include <${tr1dir}memory>],
 		[Define if compiler has shared_ptr])],
 	[sharedptr='no'])
 AC_MSG_RESULT($sharedptr)
-
-AC_MSG_CHECKING([for unique_ptr])
-unique_ptr='yes'
-AC_TRY_COMPILE([
-	#include <memory>
-	${usestd}
-	int *get_ptr();],
-	[unique_ptr<int> i(get_ptr())],
-	[AC_DEFINE(PQXX_HAVE_UNIQUE_PTR,
-		1,
-		[Define if compiler has unique_ptr])],
-	[unique_ptr='no'])
-AC_MSG_RESULT($unique_ptr)
-
-AC_MSG_CHECKING([for move()])
-move='yes'
-AC_TRY_COMPILE([
-	#include <utility>
-	${usestd}
-	int foo(int &i) { return move(i); }],
-	[int i = 0; return foo(i);],
-	[AC_DEFINE(PQXX_HAVE_MOVE,
-		1,
-		[Define if compiler has move().])],
-	[move='no'])
-AC_MSG_RESULT($move)
 
 AC_MSG_CHECKING([whether overloaded using-declarations work])
 AC_TRY_COMPILE([
@@ -1027,9 +1051,10 @@ AC_MSG_RESULT($usingdecl)
 
 AC_PROG_MAKE_SET
 
-AC_CONFIG_FILES([Makefile config/Makefile doc/Makefile
+AC_CONFIG_FILES([Makefile config/Makefile debian/Makefile doc/Makefile
 doc/Doxyfile src/Makefile test/Makefile test/unit/Makefile tools/Makefile
-win32/Makefile include/Makefile include/pqxx/Makefile libpqxx.pc pqxx-config])
+win32/Makefile include/Makefile include/pqxx/Makefile libpqxx.pc pqxx-config
+libpqxx.spec])
 
 
 AC_CONFIG_COMMANDS([configitems], ["${srcdir}/tools/splitconfig" "${srcdir}"])

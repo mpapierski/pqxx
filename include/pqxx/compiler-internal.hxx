@@ -7,7 +7,7 @@
  *      Compiler deficiency workarounds for compiling libpqxx itself.
  *      DO NOT INCLUDE THIS FILE when building client programs.
  *
- * Copyright (c) 2002-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2002-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -25,6 +25,8 @@
 // Library-private configuration related to libpq version
 #include "pqxx/config-internal-libpq.h"
 
+#include <cstddef>
+
 #ifdef _WIN32
 
 #ifdef PQXX_SHARED
@@ -36,13 +38,11 @@
 
 #ifdef _MSC_VER
 #pragma warning (disable: 4251 4275 4273)
-#pragma warning (disable: 4258) // Complains that for-scope usage is correct.
+#pragma warning (disable: 4258) // Complains that for-scope usage is correct
 #pragma warning (disable: 4290)
-#pragma warning (disable: 4351)
 #pragma warning (disable: 4355)
 #pragma warning (disable: 4786)
-#pragma warning (disable: 4800)	// Performance warning for boolean conversions.
-#pragma warning (disable: 4996) // Complains that strncpy() "may" be unsafe.
+#pragma warning (disable: 4800)	// Performance warning for boolean conversions
 #endif
 
 #elif defined(__GNUC__) && defined(PQXX_HAVE_GCC_VISIBILITY)	// !_WIN32
@@ -54,8 +54,6 @@
 
 
 #include "pqxx/compiler-public.hxx"
-
-#include <cstddef>
 
 #ifdef PQXX_HAVE_LIMITS
 #include <limits>
@@ -73,4 +71,26 @@ template<> inline long numeric_limits<long>::max() throw () {return LONG_MAX;}
 template<> inline long numeric_limits<long>::min() throw () {return LONG_MIN;}
 }
 #endif // PQXX_HAVE_LIMITS
+
+
+namespace pqxx
+{
+namespace internal
+{
+/// Wrapper for std::distance; not all platforms have std::distance().
+template<typename T> inline ptrdiff_t distance(T first, T last)
+{
+#ifdef PQXX_HAVE_DISTANCE
+  return PGSTD::distance(first, last);
+#else
+  // Naive implementation.  All we really need for now.
+  ptrdiff_t d;
+  for (d=0; first != last; ++d) ++first;
+  return d;
 #endif
+}
+}
+}
+
+#endif
+

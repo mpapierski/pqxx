@@ -68,7 +68,7 @@ public:
     throw deliberate_error();
   }
 
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     pqxx::test::expected_exception(Name() + " failed: " + Reason);
   }
@@ -80,12 +80,6 @@ void test_013(transaction_base &T)
   connection_base &C(T.conn());
   T.abort();
 
-  {
-    work T2(C);
-    test::create_pqxxevents(T2);
-    T2.commit();
-  }
-
   const string Table = "pqxxevents";
 
   pair<int,int> Before;
@@ -96,7 +90,7 @@ void test_013(transaction_base &T)
 	"Already have event for " + to_string(BoringYear) + "--can't test.");
 
   const FailedInsert DoomedTransaction(Table);
-  quiet_errorhandler d(C);
+  disable_noticer d(C);
   PQXX_CHECK_THROWS(
 	C.perform(DoomedTransaction),
 	deliberate_error,

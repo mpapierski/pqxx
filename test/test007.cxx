@@ -48,10 +48,13 @@ public:
     // First select all different years occurring in the table.
     result R( T.exec("SELECT year FROM pqxxevents") );
 
+    // SELECT affects no rows.
+    PQXX_CHECK(!R.affected_rows(), "SELECT affects rows.");
+
     // See if we get reasonable type identifier for this column
     const oid rctype = R.column_type(0);
     PQXX_CHECK_EQUAL(
-	R.column_type(pqxx::tuple::size_type(0)),
+	R.column_type(result::tuple::size_type(0)),
 	rctype,
 	"Inconsistent result::column_type().");
 
@@ -84,14 +87,13 @@ public:
 
       PQXX_CHECK_EQUAL(
 	tctype,
-	r->column_type(pqxx::tuple::size_type(0)),
-	"Inconsistent pqxx::tuple::column_type()");
+	r->column_type(result::tuple::size_type(0)),
+	"Inconsistent result::tuple::column_type()");
 
       PQXX_CHECK_EQUAL(
 	tctype,
 	rctype,
-	"pqxx::tuple::column_type() is inconsistent with "
-		"result::column_type().");
+	"tuple::column_type() is inconsistent with result::column_type().");
 
       const oid ctctype = r->column_type(rcol);
 
@@ -144,7 +146,7 @@ public:
   }
 
   // Postprocessing code for aborted execution attempt
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     try
     {
@@ -168,12 +170,6 @@ void test_007(transaction_base &T)
   connection_base &C(T.conn());
   T.abort();
   C.set_client_encoding("SQL_ASCII");
-
-  {
-    work T2(C);
-    test::create_pqxxevents(T2);
-    T2.commit();
-  }
 
   // Perform (an instantiation of) the UpdateYears transactor we've defined
   // in the code above.  This is where the work gets done.

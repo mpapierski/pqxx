@@ -19,15 +19,9 @@ class PQXX_PRIVATE connection_parameterized_invocation :
 	const PGSTD::string &query,
 	const char *const params[],
 	const int paramlengths[],
-	const int binaries[],
 	int nparams)
   {
-    return home().parameterized_exec(
-	query,
-	params,
-	paramlengths,
-	binaries,
-	nparams);
+    return home().parameterized_exec(query, params, paramlengths, nparams);
   }
 };
 } // namespace pqxx::internal::gate

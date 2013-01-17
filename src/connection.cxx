@@ -7,7 +7,7 @@
  *      implementation of the pqxx::connection and sibling classes.
  *   Different ways of setting up a backend connection.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -32,7 +32,7 @@ pqxx::connectionpolicy::connectionpolicy(const PGSTD::string &opts) :
 }
 
 
-pqxx::connectionpolicy::~connectionpolicy() PQXX_NOEXCEPT
+pqxx::connectionpolicy::~connectionpolicy() throw ()
 {
 }
 
@@ -66,13 +66,13 @@ pqxx::connectionpolicy::do_completeconnect(handle orig)
 }
 
 pqxx::connectionpolicy::handle
-pqxx::connectionpolicy::do_dropconnect(handle orig) PQXX_NOEXCEPT
+pqxx::connectionpolicy::do_dropconnect(handle orig) throw ()
 {
   return orig;
 }
 
 pqxx::connectionpolicy::handle
-pqxx::connectionpolicy::do_disconnect(handle orig) PQXX_NOEXCEPT
+pqxx::connectionpolicy::do_disconnect(handle orig) throw ()
 {
   orig = do_dropconnect(orig);
   if (orig) PQfinish(orig);
@@ -80,7 +80,7 @@ pqxx::connectionpolicy::do_disconnect(handle orig) PQXX_NOEXCEPT
 }
 
 
-bool pqxx::connectionpolicy::is_ready(handle h) const PQXX_NOEXCEPT
+bool pqxx::connectionpolicy::is_ready(handle h) const throw ()
 {
   return h != 0;
 }
@@ -121,7 +121,7 @@ pqxx::connect_async::do_startconnect(handle orig)
   m_connecting = false;
   orig = PQconnectStart(options().c_str());
   if (!orig) throw bad_alloc();
-  if (PQstatus(orig) == CONNECTION_BAD)
+  if (PQconnectPoll(orig) == PGRES_POLLING_FAILED)
   {
     do_dropconnect(orig);
     throw broken_connection(string(PQerrorMessage(orig)));
@@ -141,10 +141,11 @@ pqxx::connect_async::do_completeconnect(handle orig)
   // Our "attempt to connect" state ends here, for better or for worse
   m_connecting = false;
 
-  PostgresPollingStatusType pollstatus = PGRES_POLLING_WRITING;
+  PostgresPollingStatusType pollstatus;
 
   do
   {
+    pollstatus = PQconnectPoll(orig);
     switch (pollstatus)
     {
     case PGRES_POLLING_FAILED:
@@ -159,15 +160,10 @@ pqxx::connect_async::do_completeconnect(handle orig)
       internal::wait_write(orig);
       break;
 
+    case PGRES_POLLING_ACTIVE:
     case PGRES_POLLING_OK:
       break;
-
-    default:
-      // Meaningless, really, but deals with the obsolete PGRES_POLLING_ACTIVE
-      // without requiring it to be defined.
-      break;
     }
-    pollstatus = PQconnectPoll(orig);
   } while (pollstatus != PGRES_POLLING_OK);
 
   return orig;
@@ -175,14 +171,14 @@ pqxx::connect_async::do_completeconnect(handle orig)
 
 
 pqxx::connectionpolicy::handle
-pqxx::connect_async::do_dropconnect(handle orig) PQXX_NOEXCEPT
+pqxx::connect_async::do_dropconnect(handle orig) throw ()
 {
   m_connecting = false;
   return orig;
 }
 
 
-bool pqxx::connect_async::is_ready(handle h) const PQXX_NOEXCEPT
+bool pqxx::connect_async::is_ready(handle h) const throw ()
 {
   return h && !m_connecting;
 }

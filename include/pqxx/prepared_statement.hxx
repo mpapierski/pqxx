@@ -7,7 +7,7 @@
  *      Helper classes for defining and executing prepared statements
  *   See the connection_base hierarchy for more about prepared statements
  *
- * Copyright (c) 2006-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2006-2009, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -26,11 +26,9 @@
 
 namespace pqxx
 {
-class binarystring;
 class connection_base;
 class transaction_base;
 class result;
-
 
 /// Dedicated namespace for helper types related to prepared statements
 namespace prepare
@@ -60,9 +58,9 @@ namespace prepare
  * @endcode
  *
  * Once you've done this, you'll be able to call @c my_statement from any
- * transaction you execute on the same connection.  You start an invocation by
- * looking up your statement using a member function called @c "prepared".  (The
- * definition used a different member function, called @c "prepare" ).
+ * transaction you execute on the same connection.  Note that this uses a member
+ * function called @c "prepared"; the definition used a member function called
+ * @c "prepare".
  *
  * @code
  * pqxx::result execute_my_statement(pqxx::transaction_base &t)
@@ -71,33 +69,35 @@ namespace prepare
  * }
  * @endcode
  *
- * Did I mention that prepared statements can have parameters?  The query text
- * can contain $@c 1, @c $2 etc. as placeholders for parameter values that you
- * will provide when you invoke the prepared satement.
+ * Did I mention that you can pass parameters to prepared statements?  You
+ * define those along with the statement.  The query text uses $@c 1, @c $2 etc.
+ * as placeholders for the parameters in the SQL text.  Since your C++ compiler
+ * doesn't know how many parameters you're going to define, the syntax that lets
+ * you do this is a bit strange:
  *
  * @code
  * void prepare_find(pqxx::connection_base &c)
  * {
  *   // Prepare a statement called "find" that looks for employees with a given
  *   // name (parameter 1) whose salary exceeds a given number (parameter 2).
- *   c.prepare(
- *   	"find",
- *   	"SELECT * FROM Employee WHERE name = $1 AND salary > $2");
+ *   const std::string sql =
+ *     "SELECT * FROM Employee WHERE name = $1 AND salary > $2";
+ * 
+ *   c.prepare("find", sql)("varchar", pqxx::prepare::treat_string)("integer");
  * }
  * @endcode
  *
- * How do you pass those parameters?  C++ has no good way to let you pass an
- * unlimited, variable number of arguments to a function call, and the compiler
- * does not know how many you are going to pass.  There's a trick for that: you
- * can treat the value you get back from @c prepared as a function, which you
- * call to pass a parameter.  What you get back from that call is the same
- * again, so you can call it again to pass another parameter and so on.
+ * The first parameter is defined as having SQL type @c varchar; and libpqxx is
+ * to treat it as a string.  This last point matters if prepared-statement
+ * support is missing in the current backend version or the underlying C
+ * library, and libpqxx needs to emulate the prepared statement.  See
+ * pqxx::prepare::param_treatment for the list of ways parameters may need to be
+ * treated.  This detail will go away in the future.
  *
- * Once you've passed all parameters in this way, you invoke the statement with
- * the parameters by calling @c exec on the invocation.
+ * The second parameter is an integer, with default treatment by libpqxx.
  *
- * This example looks up the prepared statement "find," passes @c name and
- * @c min_salary as parameters, and invokes the statement with those values:
+ * When invoking the prepared statement, you pass parameter values using the
+ * same syntax.
  *
  * @code
  * pqxx::result execute_find(
@@ -120,6 +120,74 @@ namespace prepare
  * indexes, etc.
  */
 
+/// Type of treatment of a particular parameter to a prepared statement
+/** This information is needed to determine whether a parameter needs to be
+ * quoted, escaped, binary-escaped, and/or converted to boolean as it is
+ * passed to a prepared statement on execution.
+ *
+ * This treatment becomes especially relevant when either the available libpq
+ * version doesn't provide direct support for prepared statements, so the
+ * definition must be generated as SQL.  This is the case with libpq versions
+ * prior to the one shipped with PostgreSQL 7.4).
+ *
+ * To pass binary data into a prepared statement, declare it using treat_binary.
+ * When invoking the statement, pass in the binary data as a standard string
+ * object.  If your data can contain null bytes, be careful to have those
+ * included in the string object: @c std::string("\0 xyz") will construct an
+ * empty string because it stops reading data at the nul byte.  You can include
+ * the full array of data by passing its length to the string constructor:
+ * @c std::string("\0 xyz", 5)
+ */
+enum param_treatment
+{
+  /// Pass as raw, binary bytes.
+  treat_binary,
+  /// Escape special characters and add quotes.
+  treat_string,
+  /// Represent as named Boolean value.
+  treat_bool,
+  /// Include directly in SQL without conversion (e.g. for numeric types).
+  treat_direct
+};
+
+
+/// Helper class for declaring parameters to prepared statements
+/** You probably won't want to use this class.  It's here just so you can
+ * declare parameters by adding parenthesized declarations directly after the
+ * statement declaration itself:
+ *
+ * @code
+ * C.prepare(name, query)(paramtype1)(paramtype2, treatment)(paramtype3);
+ * @endcode
+ */
+class PQXX_LIBEXPORT declaration
+{
+public:
+  declaration(connection_base &, const PGSTD::string &statement);
+
+  /// Add a parameter specification to prepared statement declaration
+  const declaration &
+  operator()(const PGSTD::string &sqltype, param_treatment=treat_direct) const;
+
+  /// Permit arbitrary parameters after the last declared one.
+  /**
+   * When used, this allows an arbitrary number of parameters to be passed after
+   * the last declared one.  This is similar to the C language's varargs.
+   *
+   * Calling this completes the declaration; no parameters can be declared after
+   * etc().
+   */
+  const declaration &etc(param_treatment=treat_direct) const;
+
+private:
+  /// Not allowed
+  declaration &operator=(const declaration &);
+
+  connection_base &m_home;
+  const PGSTD::string m_statement;
+};
+
+
 /// Helper class for passing parameters to, and executing, prepared statements
 class PQXX_LIBEXPORT invocation : internal::statement_parameters
 {
@@ -132,40 +200,25 @@ public:
   /// Has a statement of this name been defined?
   bool exists() const;
 
-  /// Pass null parameter.
+  /// Pass null parameter
   invocation &operator()() { add_param(); return *this; }
 
-  /// Pass parameter value.
+  /// Pass parameter value
   /**
-   * @param v parameter value; will be represented as a string internally.
+   * @param v parameter value (will be represented as a string internally)
    */
   template<typename T> invocation &operator()(const T &v)
-	{ add_param(v, true); return *this; }
+	{ add_param(v); return *this; }
 
-  /// Pass binary parameter value for a BYTEA field.
+  /// Pass parameter value
   /**
-   * @param v binary string; will be passed on directly in binary form.
-   */
-  invocation &operator()(const binarystring &v)
-	{ add_binary_param(v, true); return *this; }
-
-  /// Pass parameter value.
-  /**
-   * @param v parameter value (will be represented as a string internally).
-   * @param nonnull replaces value with null if set to false.
+   * @param v parameter value (will be represented as a string internally)
+   * @param nonnull replaces value with null if set to false
    */
   template<typename T> invocation &operator()(const T &v, bool nonnull)
 	{ add_param(v, nonnull); return *this; }
 
-  /// Pass binary parameter value for a BYTEA field.
-  /**
-   * @param v binary string; will be passed on directly in binary form.
-   * @param nonnull determines whether to pass a real value, or NULL.
-   */
-  invocation &operator()(const binarystring &v, bool nonnull)
-	{ add_binary_param(v, nonnull); return *this; }
-
-  /// Pass C-style parameter string, or null if pointer is null.
+  /// Pass C-style parameter string, or null if pointer is null
   /**
    * This version is for passing C-style strings; it's a template, so any
    * pointer type that @c to_string accepts will do.
@@ -187,7 +240,7 @@ public:
   template<typename T> invocation &operator()(T *v, bool nonnull=true)
 	{ add_param(v, nonnull); return *this; }
 
-  /// Pass C-style string parameter, or null if pointer is null.
+  /// Pass C-style string parameter, or null if pointer is null
   /** This duplicates the pointer-to-template-argument-type version of the
    * operator, but helps compilers with less advanced template implementations
    * disambiguate calls where C-style strings are passed.
@@ -213,13 +266,43 @@ namespace internal
 /// Internal representation of a prepared statement definition
 struct PQXX_LIBEXPORT prepared_def
 {
+  /// Parameter definition
+  struct param
+  {
+    PGSTD::string sqltype;
+    param_treatment treatment;
+
+    param(const PGSTD::string &SQLtype, param_treatment);
+  };
+
   /// Text of prepared query
   PGSTD::string definition;
+  /// Parameter list
+  PGSTD::vector<param> parameters;
   /// Has this prepared statement been prepared in the current session?
   bool registered;
+  /// Is this definition complete?
+  bool complete;
+
+  /// Does this statement accept variable arguments, as declared with etc()?
+  bool varargs;
+
+  /// How should parameters after the last declared one be treated?
+  param_treatment varargs_treatment;
 
   prepared_def();
   explicit prepared_def(const PGSTD::string &);
+
+  void addparam(const PGSTD::string &sqltype, param_treatment);
+};
+
+/// Utility functor: get prepared-statement parameter's SQL type string
+struct PQXX_PRIVATE get_sqltype
+{
+  template<typename IT> const PGSTD::string &operator()(IT i)
+  {
+    return i->sqltype;
+  }
 };
 
 } // namespace pqxx::prepare::internal

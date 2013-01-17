@@ -3,7 +3,7 @@
 
 // We need some libpqxx-internal configuration items.  DON'T INCLUDE THIS HEADER
 // IN NORMAL CLIENT PROGRAMS!
-#include "pqxx/config-internal-compiler.h"
+#include "pqxx/compiler-internal.hxx"
 
 #ifdef PQXX_HAVE_LOCALE
 #include <locale>
@@ -26,7 +26,7 @@ template<typename T> void testitems(const T &I, typename T::size_type s)
 
   for ( ; s; --s)
   {
-    const typename T::size_type value = typename T::size_type((I[s-1]));
+    const typename T::size_type value(I[s-1]);
     PQXX_CHECK_EQUAL(value, s, "Wrong value in items object.");
   }
 }
@@ -70,7 +70,7 @@ struct intderef
 {
   intderef(){}	// Silences bogus warning in some gcc versions
   template<typename ITER>
-    int operator()(ITER i) const PQXX_NOEXCEPT { return int(*i); }
+    int operator()(ITER i) const throw () { return int(*i); }
 };
 
 
@@ -98,9 +98,6 @@ void test_000(transaction_base &)
   testitems(I4,4);
   items<int> I5(1,2,3,4,5);
   testitems(I5,5);
-  items<int> Ivar;
-  Ivar(1);
-  testitems(Ivar,1);
   const string l = separated_list(",",I5.begin(),I5.end(),intderef());
   PQXX_CHECK_EQUAL(l, "1,2,3,4,5", "separated_list is broken.");
   vector<int> V2(I2);
@@ -150,6 +147,7 @@ void test_000(transaction_base &)
   strconv("long", 0, "0");
   strconv("long", long_min, lminstr.str());
   strconv("long", long_max, lmaxstr.str());
+  strconv("double", 0.0, "0");
   strconv("double", not_a_number, "nan");
   strconv("string", string(), "");
   strconv("string", weirdstr, weirdstr);

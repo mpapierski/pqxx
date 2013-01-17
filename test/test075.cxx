@@ -1,3 +1,5 @@
+#include <pqxx/compiler-internal.hxx>
+
 #include <iostream>
 #include <vector>
 
@@ -13,7 +15,6 @@ namespace
 {
 void test_075(transaction_base &W)
 {
-  test::create_pqxxevents(W);
   const result R( W.exec("SELECT year FROM pqxxevents") );
   PQXX_CHECK(!R.empty(), "No events found, cannot test.");
 

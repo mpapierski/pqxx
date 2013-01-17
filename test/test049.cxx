@@ -36,7 +36,7 @@ template<typename CONTAINER> struct Add
 
   Add(string K, CONTAINER &C) : Container(C), Key(K) {}
 
-  void operator()(const pqxx::tuple &T)
+  void operator()(const result::tuple &T)
   {
     Container.push_back(T[Key].c_str());
   }
@@ -50,31 +50,31 @@ Add<CONTAINER> AdderFor(string K, CONTAINER &C)
 }
 
 
-struct Cmp : binary_function<pqxx::tuple, pqxx::tuple, bool>
+struct Cmp : binary_function<result::tuple, result::tuple, bool>
 {
   string Key;
 
   explicit Cmp(string K) : Key(K) {}
 
-  bool operator()(const pqxx::tuple &L, const pqxx::tuple &R) const
+  bool operator()(const result::tuple &L, const result::tuple &R) const
   {
     return string(L[Key].c_str()) < string(R[Key].c_str());
   }
 };
 
 
-struct CountGreaterSmaller : unary_function<pqxx::tuple, void>
+struct CountGreaterSmaller : unary_function<result::tuple, void>
 {
   string Key;
   const result &R;
 
   CountGreaterSmaller(string K, const result &X) : Key(K), R(X) {}
 
-  void operator()(const pqxx::tuple &T) const
+  void operator()(const result::tuple &T) const
   {
     // Count number of entries with key greater/smaller than first row's key
     // using std::count_if<>()
-    const ptrdiff_t
+    const result::size_type
       Greater = count_if(R.begin(), R.end(), bind2nd(Cmp(Key),T)),
       Smaller = count_if(R.begin(), R.end(), bind1st(Cmp(Key),T));
 
@@ -84,9 +84,7 @@ struct CountGreaterSmaller : unary_function<pqxx::tuple, void>
 	 << "(" << (Greater + Smaller) << " total)"
 	 << endl;
 
-    PQXX_CHECK(
-	Greater + Smaller < ptrdiff_t(R.size()),
-	"More non-equal rows than rows.");
+    PQXX_CHECK( Greater + Smaller < R.size(), "More non-equal rows than rows.");
   }
 };
 

@@ -6,7 +6,7 @@
  *   DESCRIPTION
  *      implementation of string conversions
  *
- * Copyright (c) 2008-2013, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -190,8 +190,7 @@ bool valid_infinity_string(const char str[])
   return
 	strcmp("infinity", str) == 0 ||
 	strcmp("Infinity", str) == 0 ||
-	strcmp("INFINITY", str) == 0 ||
-	strcmp("inf", str) == 0;
+	strcmp("INFINITY", str) == 0;
 }
 
 
@@ -231,7 +230,7 @@ template<typename T> inline void from_string_float(const char Str[], T &Obj)
 #if defined(PQXX_HAVE_IMBUE)
       S.imbue(locale("C"));
 #endif
-      ok = static_cast<bool>(S >> result);
+      ok = (S >> result);
     }
     break;
   }
