@@ -34,9 +34,8 @@ public:
 };
 
 
-void test_017(transaction_base &T)
+void test_017(connection_base &C, transaction_base &T)
 {
-  connection_base &C(T.conn());
   T.abort();
   C.perform(ReadTables());
 }

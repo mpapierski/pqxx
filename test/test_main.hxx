@@ -1,7 +1,6 @@
 /* main() definition for libpqxx test runners.
  */
 #include <iostream>
-#include <list>
 #include <new>
 #include <stdexcept>
 
@@ -22,7 +21,7 @@ bool have_generate_series(const connection_base &c)
 }
 
 
-string deref_field(const field &f)
+string deref_field(const result::field &f)
 {
   return f.c_str();
 }
@@ -42,7 +41,7 @@ test_failure::test_failure(const string &ffile, int fline, const string &desc) :
 {
 }
 
-test_failure::~test_failure() PQXX_NOEXCEPT {}
+test_failure::~test_failure() throw () {}
 
 
 base_test::base_test(const string &tname, testfunc func) :
@@ -93,51 +92,7 @@ string select_series(connection_base &conn, int lowest, int highest)
 }
 
 
-namespace
-{
-bool drop_table_if_exists(transaction_base &t, const PGSTD::string &table)
-{
-  if (t.conn().server_version() < 80100) return false;
-  t.exec("DROP TABLE IF EXISTS " + table);
-  return true;
-}
-}
-
-void drop_table(transaction_base &t, const PGSTD::string &table)
-{
-  if (drop_table_if_exists(t, table)) return;
-
-  dbtransaction *dbt(dynamic_cast<dbtransaction *>(&t));
-  if (dbt)
-  {
-    subtransaction s(*dbt, "drop_table");
-    try
-    {
-      s.exec("DROP TABLE " + table);
-    }
-    catch (const sql_error &e)
-    {
-      PGSTD::cerr << e.what() << PGSTD::endl;
-      s.abort();
-    }
-    s.commit();
-  }
-  else
-  {
-    nontransaction *nt(dynamic_cast<nontransaction *>(&t));
-    try
-    {
-      nt->exec("DROP TABLE " + table);
-    }
-    catch (const sql_error &e)
-    {
-      PGSTD::cerr << e.what() << PGSTD::endl;
-    }
-  }
-}
-
-
-void PQXX_NORETURN check_notreached(const char file[], int line, string desc)
+void check_notreached(const char file[], int line, string desc)
 {
   throw test_failure(file, line, desc);
 }
@@ -164,7 +119,7 @@ void expected_exception(const string &message)
 }
 
 
-string list_tuple(tuple Obj)
+string list_tuple(result::tuple Obj)
 {
   return separated_list(", ", Obj.begin(), Obj.end(), deref_field);
 }
@@ -181,30 +136,6 @@ string list_result_iterator(result::const_iterator Obj)
 {
   return "<iterator at " + to_string(Obj.rownumber()) + ">";
 }
-
-
-void create_pqxxevents(transaction_base &t)
-{
-  t.exec(
-	"CREATE TEMP TABLE pqxxevents(year integer, event varchar) "
-	"ON COMMIT PRESERVE ROWS");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (71, 'jtv')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (38, 'time_t overflow')");
-  t.exec(
-	"INSERT INTO pqxxevents(year, event) VALUES (1, '''911'' WTC attack')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (81, 'C:\\>')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (1978, 'bloody\t\tcold')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (99, '')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (2002, 'libpqxx')");
-  t.exec(
-	"INSERT INTO pqxxevents(year, event) "
-	"VALUES (1989, 'Ode an die Freiheit')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (2001, 'New millennium')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (1974, '')");
-  t.exec("INSERT INTO pqxxevents(year, event) VALUES (97, 'Asian crisis')");
-  t.exec(
-	"INSERT INTO pqxxevents(year, event) VALUES (2001, 'A Space Odyssey')");
-}
 } // namespace pqxx::test
 } // namespace pqxx
 
@@ -214,8 +145,7 @@ int main(int, const char *argv[])
   const char *const test_name = argv[1];
   const test_map &tests = register_test(NULL);
 
-  int test_count = 0;
-  list<string> failed;
+  int test_count = 0, failures = 0;
   for (test_map::const_iterator i = tests.begin(); i != tests.end(); ++i)
     if (!test_name || test_name == i->first)
     {
@@ -259,19 +189,15 @@ int main(int, const char *argv[])
       if (!success)
       {
         cerr << "FAILED: " << i->first << endl;
-        failed.push_back(i->first);
+        ++failures;
       }
       ++test_count;
     }
 
   cout << "Ran " << test_count << " test(s)." << endl;
 
-  if (!failed.empty())
-  {
-    cerr << "*** " << failed.size() << " test(s) failed: ***" << endl;
-    for (list<string>::const_iterator i=failed.begin(); i!=failed.end(); ++i)
-      cerr << "\t" << *i << endl;
-  }
+  if (failures > 0)
+    cerr << "*** " << failures << " test(s) failed. ***" << endl;
 
-  return int(failed.size());
+  return failures;
 }

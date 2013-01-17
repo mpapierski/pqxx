@@ -11,29 +11,29 @@ using namespace pqxx;
 // Example program for libpqxx.  Test waiting for notification with timeout.
 namespace
 {
-// Sample implementation of notification receiver.
-class TestListener : public notification_receiver
+// Sample implementation of notification listener
+class TestListener : public notify_listener
 {
-  bool m_done;
+  bool m_Done;
 
 public:
   explicit TestListener(connection_base &C, string Name) :
-    notification_receiver(C, Name), m_done(false)
+    notify_listener(C, Name), m_Done(false)
   {
   }
 
-  virtual void operator()(const string &, int be_pid)
+  virtual void operator()(int be_pid)
   {
-    m_done = true;
+    m_Done = true;
     PQXX_CHECK_EQUAL(
 	be_pid,
-	conn().backendpid(),
+	Conn().backendpid(),
 	"Notification came from wrong backend.");
 
-    cout << "Received notification: " << channel() << " pid=" << be_pid << endl;
+    cout << "Received notification: " << name() << " pid=" << be_pid << endl;
   }
 
-  bool done() const { return m_done; }
+  bool Done() const { return m_Done; }
 };
 
 
@@ -51,7 +51,7 @@ public:
     T.exec("NOTIFY " + m_notif);
   }
 
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     try
     {
@@ -65,9 +65,8 @@ public:
 };
 
 
-void test_079(transaction_base &orgT)
+void test_079(connection_base &C, transaction_base &orgT)
 {
-  connection_base &C(orgT.conn());
   orgT.abort();
 
   const string NotifName = "mylistener";
@@ -79,9 +78,9 @@ void test_079(transaction_base &orgT)
   PQXX_CHECK_EQUAL(notifs, 0, "Got unexpected notification.");
 
   cout << "Sending notification..." << endl;
-  C.perform(Notify(L.channel()));
+  C.perform(Notify(L.name()));
 
-  for (int i=0; (i < 20) && !L.done(); ++i)
+  for (int i=0; (i < 20) && !L.Done(); ++i)
   {
     PQXX_CHECK_EQUAL(notifs, 0, "Got notifications, but no handler called.");
     cout << ".";
@@ -89,7 +88,7 @@ void test_079(transaction_base &orgT)
   }
   cout << endl;
 
-  PQXX_CHECK(L.done(), "No notifications received.");
+  PQXX_CHECK(L.Done(), "No notifications received.");
   PQXX_CHECK_EQUAL(notifs, 1, "Got unexpected notifications.");
 }
 } // namespace

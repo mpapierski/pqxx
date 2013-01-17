@@ -8,7 +8,7 @@
  *   pqxx::transaction represents a standard database transaction
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/transaction instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -23,10 +23,6 @@
 #include "pqxx/compiler-internal-pre.hxx"
 
 #include "pqxx/dbtransaction"
-
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
 
 
 
@@ -45,10 +41,8 @@ namespace pqxx
 class PQXX_LIBEXPORT basic_transaction : public dbtransaction
 {
 protected:
-  basic_transaction(							//[t1]
-	connection_base &C,
-	const PGSTD::string &IsolationLevel,
-	readwrite_policy);
+  basic_transaction(connection_base &C,
+			     const PGSTD::string &IsolationLevel);	//[t1]
 
 private:
   virtual void do_commit();						//[t1]
@@ -84,9 +78,7 @@ private:
  * }
  * @endcode
  */
-template<
-	isolation_level ISOLATIONLEVEL=read_committed,
-	readwrite_policy READWRITE=read_write>
+template<isolation_level ISOLATIONLEVEL=read_committed>
 class transaction : public basic_transaction
 {
 public:
@@ -100,18 +92,18 @@ public:
    */
   explicit transaction(connection_base &C, const PGSTD::string &TName):	//[t1]
     namedclass(fullname("transaction", isolation_tag::name()), TName),
-    basic_transaction(C, isolation_tag::name(), READWRITE)
+    basic_transaction(C, isolation_tag::name())
 	{ Begin(); }
 
   explicit transaction(connection_base &C) :				//[t1]
     namedclass(fullname("transaction", isolation_tag::name())),
-    basic_transaction(C, isolation_tag::name(), READWRITE)
+    basic_transaction(C, isolation_tag::name())
 	{ Begin(); }
 
-  virtual ~transaction() PQXX_NOEXCEPT
+  virtual ~transaction() throw ()
   {
 #ifdef PQXX_QUIET_DESTRUCTORS
-    quiet_errorhandler quiet(conn());
+    disable_noticer Quiet(conn());
 #endif
     End();
   }
@@ -120,9 +112,6 @@ public:
 
 /// Bog-standard, default transaction type
 typedef transaction<> work;
-
-/// Read-only transaction
-typedef transaction<read_committed, read_only> read_transaction;
 
 //@}
 

@@ -19,9 +19,8 @@ void InitVector(VEC &V, typename VEC::size_type s, VAL val)
   for (typename VEC::iterator i = V.begin(); i != V.end(); ++i) *i = val;
 }
 
-void test_012(transaction_base &orgT)
+void test_012(connection_base &C, transaction_base &orgT)
 {
-  connection_base &C(orgT.conn());
   orgT.abort();
 
   const string Table = "pg_tables";
@@ -54,7 +53,7 @@ void test_012(transaction_base &orgT)
     PQXX_CHECK_EQUAL(i->size(), R.columns(), "Inconsistent row size.");
 
     // Look for null fields
-    for (pqxx::tuple::size_type f=0; f<i->size(); ++f)
+    for (result::tuple::size_type f=0; f<i->size(); ++f)
     {
       NullFields[f] += i.at(f).is_null();
 
@@ -105,7 +104,7 @@ void test_012(transaction_base &orgT)
       // fields may be sorted.  Don't do anything fancy like trying to
       // detect numbers and comparing them as such, just compare them as
       // simple strings.
-      for (pqxx::tuple::size_type f = 0; f < R.columns(); ++f)
+      for (result::tuple::size_type f = 0; f < R.columns(); ++f)
       {
         if (!j[f].is_null())
         {
@@ -119,7 +118,7 @@ void test_012(transaction_base &orgT)
     }
   }
 
-  for (pqxx::tuple::size_type f = 0; f < R.columns(); ++f)
+  for (result::tuple::size_type f = 0; f < R.columns(); ++f)
     PQXX_CHECK(
 	NullFields[f] <= int(R.size()),
 	"Found more nulls than there were rows.");

@@ -9,8 +9,3 @@ nodist_noinst_HEADERS = \
 	config-internal-compiler.h \
 	config-internal-libpq.h
 
-DISTCLEANFILES = \
-	config-internal-autotools.h \
-	config-internal-compiler.h \
-	config-internal-libpq.h \
-	config-public-compiler.h

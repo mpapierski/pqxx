@@ -67,7 +67,7 @@ public:
     throw deliberate_error();
   }
 
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     if (Reason != LastReason)
     {
@@ -82,13 +82,9 @@ public:
 string FailedInsert::LastReason;
 
 
-void test_032(transaction_base &)
+void test_032(connection_base &, transaction_base &)
 {
   lazyconnection C;
-  {
-    nontransaction W(C);
-    test::create_pqxxevents(W);
-  }
 
   const string Table = "pqxxevents";
 
@@ -102,7 +98,7 @@ void test_032(transaction_base &)
   const FailedInsert DoomedTransaction(Table);
 
   {
-    quiet_errorhandler d(C);
+    disable_noticer d(C);
     PQXX_CHECK_THROWS(
 	C.perform(DoomedTransaction),
 	deliberate_error, 

@@ -10,7 +10,7 @@ using namespace pqxx;
 // a dummy transaction to gain nontransactional access, and perform a query.
 namespace
 {
-void test_016(transaction_base &T)
+void test_016(connection_base &, transaction_base &T)
 {
   result R( T.exec("SELECT * FROM pg_tables") );
 
@@ -34,7 +34,7 @@ void test_016(transaction_base &T)
 	"Size mismatch between tuple iterator and back().");
 
   const string nullstr;
-  for (pqxx::tuple::size_type i = 0; i < c->size(); ++i)
+  for (result::tuple::size_type i = 0; i < c->size(); ++i)
     PQXX_CHECK_EQUAL(
 	c[i].as(nullstr),
 	R.back()[i].as(nullstr),

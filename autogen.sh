@@ -9,7 +9,7 @@ set -e
 #export LC_ALL=C
 
 latest_automake() {
-	for v in "-1.11" "-1.10" "-1.9" "-1.8" "-1.7" "-1.6" "" ; do
+	for v in "-1.10" "-1.9" "-1.8" "-1.7" "-1.6" "" ; do
 		if which "automake$v" >/dev/null ; then
 			echo "$v"
 			return
@@ -54,7 +54,6 @@ if which python >/dev/null ; then
 	./tools/template2mak.py test/unit/Makefile.am.template test/unit/Makefile.am
 	makewinmake win32/vc-libpqxx.mak.template win32/vc-libpqxx.mak
 	makewinmake win32/vc-test.mak.template win32/vc-test.mak
-	makewinmake win32/vc-test-unit.mak.template win32/vc-test-unit.mak
 	makewinmake win32/mingw.mak.template win32/MinGW.mak
 else
 	echo "Python not available--not generating Visual C++ makefiles."

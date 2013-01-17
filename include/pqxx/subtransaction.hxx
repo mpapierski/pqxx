@@ -8,7 +8,7 @@
  *   pqxx::subtransaction is a nested transaction, i.e. one within a transaction
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/subtransaction instead.
  *
- * Copyright (c) 2005-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2005-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -59,8 +59,7 @@ namespace pqxx
  *   try
  *   {
  *     subtransaction S(W, "droptemp");
- *     S.exec("DROP TABLE " + temptable);
- *     S.commit();
+ *     W.exec("DROP TABLE " + temptable);
  *   }
  *   catch (const undefined_table &)
  *   {
@@ -68,16 +67,12 @@ namespace pqxx
  *     // Carry on without regrets.
  *   }
  *
- *   // S may have gone into a failed state and been destroyed, but the
- *   // upper-level transaction W is still fine.  We can continue to use it.
- *   W.exec("CREATE TEMP TABLE " + temptable + "(bar integer, splat varchar)");
+ *   W.exec("CREATE TEMP TABLE " + fleetingtable +
+ *          "(bar integer, splat varchar)");
  *
  *   do_lastpart(W);
  * }
  * @endcode
- *
- * (This is just an example.  If you really wanted to do drop a table without an
- * error if it doesn't exist, you'd use DROP TABLE IF EXISTS.)
  *
  * There are no isolation levels inside a transaction.  They are not needed
  * because all actions within the same backend transaction are always performed
@@ -88,13 +83,8 @@ class PQXX_LIBEXPORT subtransaction :
   public dbtransaction
 {
 public:
-  /// Nest a subtransaction nested in another transaction.
-  explicit subtransaction(						//[t88]
-	dbtransaction &T, const PGSTD::string &Name=PGSTD::string());
-
-  /// Nest a subtransaction in another subtransaction.
-  explicit subtransaction(
-	subtransaction &T, const PGSTD::string &Name=PGSTD::string());
+  explicit subtransaction(dbtransaction &T,
+	const PGSTD::string &Name=PGSTD::string());			//[t88]
 
 private:
   virtual void do_begin();						//[t88]

@@ -1,4 +1,10 @@
+#include <pqxx/compiler-internal.hxx>
+
 #include "test_helpers.hxx"
+
+// Don't try this at home: peeking inside libpqxx to see if we can test the
+// column_table() functionality
+#include <pqxx/config-internal-libpq.h>
 
 using namespace PGSTD;
 using namespace pqxx;
@@ -14,7 +20,7 @@ void bad_connect()
   connection C("totally#invalid@connect$string!?");
 }
 
-void test_002(transaction_base &)
+void test_002(connection_base &, transaction_base &)
 {
   // Before we really connect, test the expected behaviour of the default
   // connection type, where a failure to connect results in an immediate
@@ -44,12 +50,13 @@ void test_002(transaction_base &)
   // considerate and close the connection now.  This is optional.
   C.disconnect();
 
+#ifdef PQXX_HAVE_PQFTABLE
   // Ah, this version of postgres will tell you which table a column in a
   // result came from.  Let's just test that functionality...
   const oid rtable = R.column_table(0);
   PQXX_CHECK_EQUAL(
 	rtable,
-	R.column_table(pqxx::tuple::size_type(0)),
+	R.column_table(result::tuple::size_type(0)),
 	"Inconsistent answers from column_table()");
 
   const string rcol = R.column_name(0);
@@ -63,14 +70,14 @@ void test_002(transaction_base &)
   for (result::size_type i = 0; i < R.size(); ++i)
   {
     const oid ftable = R[i][0].table();
-    PQXX_CHECK_EQUAL(ftable, rtable, "field::table() is broken.");
+    PQXX_CHECK_EQUAL(ftable, rtable, "result::field::table() is broken.");
 
     const oid ttable = R[i].column_table(0);
 
     PQXX_CHECK_EQUAL(
 	ttable,
-	R[i].column_table(pqxx::tuple::size_type(0)),
-	"Inconsistent pqxx::tuple::column_table().");
+	R[i].column_table(result::tuple::size_type(0)),
+	"Inconsistent result::tuple::column_table().");
 
     PQXX_CHECK_EQUAL(ttable, rtable, "Inconsistent result::column_table().");
 
@@ -79,8 +86,9 @@ void test_002(transaction_base &)
     PQXX_CHECK_EQUAL(
 	cttable,
 	rtable,
-	"pqxx::tuple::column_table() is broken.");
+	"result::tuple::column_table() is broken.");
   }
+#endif
 }
 
 } // namespace

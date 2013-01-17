@@ -1,3 +1,5 @@
+#include <pqxx/compiler-internal.hxx>
+
 #include <iostream>
 
 #include "test_helpers.hxx"
@@ -52,7 +54,7 @@ void ActivationTest(connection_base &C, string style, string expected)
 }
 
 
-void test_064(transaction_base &)
+void test_064(connection_base &, transaction_base &)
 {
   asyncconnection C;
 
@@ -69,7 +71,7 @@ void test_064(transaction_base &)
   ActivationTest(C, "SQL", SQLname);
 
   // Prove that setting an unknown variable causes an error, as expected
-  quiet_errorhandler d(C);
+  disable_noticer d(C);
   PQXX_CHECK_THROWS(
 	C.set_variable("NONEXISTENT_VARIABLE_I_HOPE", "1"),
 	sql_error,

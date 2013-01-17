@@ -7,9 +7,9 @@ using namespace pqxx;
 // Simple test program for libpqxx.  Issue invalid query and handle error.
 namespace
 {
-void test_056(transaction_base &T)
+void test_056(connection_base &C, transaction_base &T)
 {
-  quiet_errorhandler d(T.conn());
+  disable_noticer d(C);
 
   PQXX_CHECK_THROWS(
 	T.exec("DELIBERATELY INVALID TEST QUERY...", "invalid_query"),

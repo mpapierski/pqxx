@@ -54,7 +54,7 @@ class FailedInsert : public transactor<robusttransaction<> >
   static string LastReason;
 public:
   FailedInsert(string Table) :
-    transactor<argument_type>("FailedInsert037"),
+    transactor<argument_type>("FailedInsert"),
     m_Table(Table)
   {
   }
@@ -68,7 +68,7 @@ public:
     throw deliberate_error();
   }
 
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     if (Reason != LastReason)
     {
@@ -83,38 +83,34 @@ public:
 string FailedInsert::LastReason;
 
 
-void test_037(transaction_base &)
+void test_037(connection_base &, transaction_base &)
 {
-  lazyconnection C;
-  {
-    nontransaction T(C);
-    test::create_pqxxevents(T);
-  }
+    lazyconnection C;
 
-  const string Table = "pqxxevents";
+    const string Table = "pqxxevents";
 
-  pair<int,int> Before;
-  C.perform(CountEvents(Table, Before));
-  PQXX_CHECK_EQUAL(
+    pair<int,int> Before;
+    C.perform(CountEvents(Table, Before));
+    PQXX_CHECK_EQUAL(
 	Before.second,
 	0,
 	"Already have event for " + to_string(BoringYear) + ", cannot test.");
 
-  const FailedInsert DoomedTransaction(Table);
+    const FailedInsert DoomedTransaction(Table);
 
-  {
-    quiet_errorhandler d(C);
-    PQXX_CHECK_THROWS(
+    {
+      disable_noticer d(C);
+      PQXX_CHECK_THROWS(
 	C.perform(DoomedTransaction),
 	deliberate_error,
 	"Did not get expected exception from failing transactor.");
-  }
+    }
 
-  pair<int,int> After;
-  C.perform(CountEvents(Table, After));
+    pair<int,int> After;
+    C.perform(CountEvents(Table, After));
 
-  PQXX_CHECK_EQUAL(After.first, Before.first, "Number of events changed.");
-  PQXX_CHECK_EQUAL(
+    PQXX_CHECK_EQUAL(After.first, Before.first, "Number of events changed.");
+    PQXX_CHECK_EQUAL(
 	After.second,
 	Before.second,
 	"Number of events for " + to_string(BoringYear) + " changed.");

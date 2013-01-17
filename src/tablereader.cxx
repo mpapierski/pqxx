@@ -7,7 +7,7 @@
  *      implementation of the pqxx::tablereader class.
  *   pqxx::tablereader enables optimized batch reads from a database table
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -17,14 +17,8 @@
  */
 #include "pqxx/compiler-internal.hxx"
 
-#ifdef PQXX_QUIET_DESTRUCTORS
-#include "pqxx/errorhandler"
-#endif
-
 #include "pqxx/tablereader"
 #include "pqxx/transaction"
-
-#include "pqxx/internal/gates/transaction-tablereader.hxx"
 
 using namespace PGSTD;
 using namespace pqxx::internal;
@@ -44,15 +38,15 @@ void pqxx::tablereader::setup(transaction_base &T,
     const PGSTD::string &Name,
     const PGSTD::string &Columns)
 {
-  gate::transaction_tablereader(T).BeginCopyRead(Name, Columns);
+  T.BeginCopyRead(Name, Columns);
   register_me();
   m_Done = false;
 }
 
-pqxx::tablereader::~tablereader() PQXX_NOEXCEPT
+pqxx::tablereader::~tablereader() throw ()
 {
 #ifdef PQXX_QUIET_DESTRUCTORS
-  quiet_errorhandler quiet(m_Trans.conn());
+  disable_noticer Quiet(m_Trans.conn());
 #endif
   try
   {
@@ -69,7 +63,7 @@ bool pqxx::tablereader::get_raw_line(PGSTD::string &Line)
 {
   if (!m_Done) try
   {
-    m_Done = !gate::transaction_tablereader(m_Trans).ReadCopyLine(Line);
+    m_Done = !m_Trans.ReadCopyLine(Line);
   }
   catch (const exception &)
   {
@@ -116,7 +110,7 @@ void pqxx::tablereader::reader_close()
 
 namespace
 {
-inline bool is_octalchar(char o) PQXX_NOEXCEPT
+inline bool is_octalchar(char o) throw ()
 {
   return (o>='0') && (o<='7');
 }

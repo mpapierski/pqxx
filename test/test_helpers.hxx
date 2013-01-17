@@ -18,10 +18,10 @@ public:
 	int fline,
 	const PGSTD::string &desc);
 
-  ~test_failure() PQXX_NOEXCEPT;
+  ~test_failure() throw ();
 
-  const PGSTD::string &file() const PQXX_NOEXCEPT { return m_file; }
-  int line() const PQXX_NOEXCEPT { return m_line; }
+  const PGSTD::string &file() const throw () { return m_file; }
+  int line() const throw () { return m_line; }
 };
 
 
@@ -43,10 +43,6 @@ void prepare_series(transaction_base &t, int lowest, int highest);
 PGSTD::string select_series(connection_base &conn, int lowest, int highest);
 
 
-/// Drop a table, if it exists.
-void drop_table(transaction_base &, const PGSTD::string &table);
-
-
 class base_test;
 typedef PGSTD::map<PGSTD::string, base_test *> test_map;
 
@@ -58,7 +54,7 @@ const test_map &register_test(base_test *);
 class base_test
 {
 public:
-  typedef void (*testfunc)(transaction_base &);
+  typedef void (*testfunc)(connection_base &, transaction_base &);
 
   base_test(const PGSTD::string &tname, testfunc func);
 
@@ -66,7 +62,7 @@ public:
   virtual void run() =0;
 
   virtual ~base_test() =0;
-  const PGSTD::string &name() const PQXX_NOEXCEPT { return m_name; }
+  const PGSTD::string &name() const throw () { return m_name; }
 private:
   PGSTD::string m_name;
 protected:
@@ -81,22 +77,21 @@ class test_case : public base_test
 public:
   // func takes connection and transaction as arguments.
   test_case(const PGSTD::string &tname, testfunc func) :
-    base_test(tname, func)
+    base_test(tname, func),
+    m_conn(),
+    m_trans(m_conn, tname)
   {
+    // Workaround for older backend versions that lack generate_series().
+    prepare_series(m_trans, 0, 100);
   }
 
   ~test_case() {}
 
-  virtual void run()
-  {
-    CONNECTION c;
-    TRANSACTION t(c, name());
+  virtual void run() { m_func(m_conn, m_trans); }
 
-    // Workaround for older backend versions that lack generate_series().
-    prepare_series(t, 0, 100);
-
-    m_func(t);
-  }
+private:
+  CONNECTION m_conn;
+  TRANSACTION m_trans;
 };
 
 
@@ -204,50 +199,11 @@ inline void check_not_equal(
 }
 
 
-// Verify that value1 is less than value2.
-#define PQXX_CHECK_LESS(value1, value2, desc) \
-	pqxx::test::check_less( \
-		__FILE__, \
-		__LINE__, \
-		(value1), \
-		#value1, \
-		(value2), \
-		#value2, \
-		(desc))
-template<typename VALUE1, typename VALUE2>
-inline void check_less(
-	const char file[],
-	int line,
-	VALUE1 value1,
-	const char text1[],
-	VALUE2 value2,
-	const char text2[],
-	PGSTD::string desc)
-{
-  if (value1 < value2) return;
-  const PGSTD::string fulldesc =
-	desc + " (" + text1 + " >= " + text2 + ": "
-	"\"lower\"=" + to_string(value1) + ", "
-	"\"upper\"=" + to_string(value2) + ")";
-  throw test_failure(file, line, fulldesc);
-}
-
-
 struct failure_to_fail {};
-
-
-namespace internal
-{
-/// Syntactic placeholder: require (and accept) semicolon after block.
-inline void end_of_statement()
-{
-}
-}
-
 
 // Verify that "action" throws "exception_type."
 #define PQXX_CHECK_THROWS(action, exception_type, desc) \
-	{ \
+	do { \
 	  try \
 	  { \
 	    action ; \
@@ -267,8 +223,7 @@ inline void end_of_statement()
 		" (\"" #action "\" " \
 		"threw exception other than " #exception_type ")"); \
 	  } \
-	} \
-        pqxx::test::internal::end_of_statement()
+	} while (false)
 
 #define PQXX_CHECK_BOUNDS(value, lower, upper, desc) \
 	pqxx::test::check_bounds( \
@@ -324,27 +279,23 @@ void expected_exception(const PGSTD::string &);
 
 
 // Represent result tuple as string
-PGSTD::string list_tuple(tuple);
+PGSTD::string list_tuple(result::tuple);
 // Represent result as string
 PGSTD::string list_result(result);
 // Represent result iterator as string
 PGSTD::string list_result_iterator(result::const_iterator);
-
-
-// @deprecated Set up test data for legacy tests.
-void create_pqxxevents(transaction_base &);
 } // namespace test
 
 
 // Support string conversion on result rows for debug output.
-template<> struct string_traits<tuple>
+template<> struct string_traits<result::tuple>
 {
-  static const char *name() { return "pqxx::tuple"; }
+  static const char *name() { return "pqxx::result::tuple"; }
   static bool has_null() { return false; }
-  static bool is_null(tuple) { return false; }
+  static bool is_null(result::tuple) { return false; }
   static result null(); // Not needed
   static void from_string(const char Str[], result &Obj); // Not needed
-  static PGSTD::string to_string(tuple Obj)
+  static PGSTD::string to_string(result::tuple Obj)
 	{ return pqxx::test::list_tuple(Obj); }
 };
 
@@ -387,3 +338,5 @@ template<> struct string_traits<PGSTD::vector<PGSTD::string> >
 				 { return separated_list("; ", Obj); }
 };
 } // namespace pqxx
+
+

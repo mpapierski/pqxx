@@ -9,7 +9,7 @@
  *   represents a database transaction
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/transaction_base instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2008, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -61,9 +61,9 @@ public:
 
 protected:
   void register_me();
-  void unregister_me() PQXX_NOEXCEPT;
-  void reg_pending_error(const PGSTD::string &) PQXX_NOEXCEPT;
-  bool registered() const PQXX_NOEXCEPT { return m_registered; }
+  void unregister_me() throw ();
+  void reg_pending_error(const PGSTD::string &) throw ();
+  bool registered() const throw () { return m_registered; }
 
   transaction_base &m_Trans;
 
@@ -78,45 +78,8 @@ private:
   transactionfocus &operator=(const transactionfocus &);
 };
 
-
-class PQXX_LIBEXPORT parameterized_invocation : statement_parameters
-{
-public:
-  parameterized_invocation(connection_base &, const PGSTD::string &query);
-
-  parameterized_invocation &operator()() { add_param(); return *this; }
-  parameterized_invocation &operator()(const binarystring &v)
-	{ add_binary_param(v, true); return *this; }
-  template<typename T> parameterized_invocation &operator()(const T &v)
-	{ add_param(v, true); return *this; }
-  parameterized_invocation &operator()(const binarystring &v, bool nonnull)
-	{ add_binary_param(v, nonnull); return *this; }
-  template<typename T>
-	parameterized_invocation &operator()(const T &v, bool nonnull)
-	{ add_param(v, nonnull); return *this; }
-
-  result exec();
-
-private:
-  /// Not allowed
-  parameterized_invocation &operator=(const parameterized_invocation &);
-
-  connection_base &m_home;
-  const PGSTD::string m_query;
-};
 } // namespace internal
 
-
-namespace internal
-{
-namespace gate
-{
-class transaction_subtransaction;
-class transaction_tablereader;
-class transaction_tablewriter;
-class transaction_transactionfocus;
-} // namespace internal::gate
-} // namespace internal
 
 
 /// Interface definition (and common code) for "transaction" classes.
@@ -165,12 +128,14 @@ public:
    */
   //@{
   /// Escape string for use as SQL string literal in this transaction
-  PGSTD::string esc(const char str[]) const          { return conn().esc(str); }
+  PGSTD::string esc(const char str[]) const				//[t90]
+                                                     { return m_Conn.esc(str); }
   /// Escape string for use as SQL string literal in this transaction
-  PGSTD::string esc(const char str[], size_t maxlen) const
-                                             { return conn().esc(str, maxlen); }
+  PGSTD::string esc(const char str[], size_t maxlen) const		//[t90]
+                                             { return m_Conn.esc(str, maxlen); }
   /// Escape string for use as SQL string literal in this transaction
-  PGSTD::string esc(const PGSTD::string &str) const  { return conn().esc(str); }
+  PGSTD::string esc(const PGSTD::string &str) const			//[t90]
+                                                     { return m_Conn.esc(str); }
 
   /// Escape binary data for use as SQL string literal in this transaction
   /** Raw, binary data is treated differently from regular strings.  Binary
@@ -185,24 +150,14 @@ public:
    * special escape sequences.
    */
   PGSTD::string esc_raw(const unsigned char str[], size_t len) const	//[t62]
-                                            { return conn().esc_raw(str, len); }
+                                            { return m_Conn.esc_raw(str, len); }
   /// Escape binary data for use as SQL string literal in this transaction
   PGSTD::string esc_raw(const PGSTD::string &) const;			//[t62]
 
   /// Represent object as SQL string, including quoting & escaping.
   /** Nulls are recognized and represented as SQL nulls. */
   template<typename T> PGSTD::string quote(const T &t) const
-                                                     { return conn().quote(t); }
-
-  /// Binary-escape and quote a binarystring for use as an SQL constant.
-  PGSTD::string quote_raw(const unsigned char str[], size_t len) const
-					  { return conn().quote_raw(str, len); }
-
-  PGSTD::string quote_raw(const PGSTD::string &str) const;
-
-  /// Escape an SQL identifier for use in a query.
-  PGSTD::string quote_name(const PGSTD::string &identifier) const
-				       { return conn().quote_name(identifier); }
+                                                     { return m_Conn.quote(t); }
   //@}
 
   /// Execute query
@@ -225,22 +180,14 @@ public:
 	      const PGSTD::string &Desc=PGSTD::string());		//[t1]
 
   result exec(const PGSTD::stringstream &Query,
-	      const PGSTD::string &Desc=PGSTD::string())
+	      const PGSTD::string &Desc=PGSTD::string())		//[t9]
 	{ return exec(Query.str(), Desc); }
-
-  /// Parameterize a statement.
-  /* Use this to build up a parameterized statement invocation, then invoke it
-   * using @c exec()
-   *
-   * Example: @c trans.parameterized("SELECT $1 + 1")(1).exec();
-   */
-  internal::parameterized_invocation parameterized(const PGSTD::string &query);
 
   /**
    * @name Prepared statements
    */
   //@{
-  /// Execute prepared statement.
+  /// Execute prepared statement
   /** Prepared statements are defined using the connection classes' prepare()
    * function, and continue to live on in the ongoing session regardless of
    * the context they were defined in (unless explicitly dropped using the
@@ -264,13 +211,6 @@ public:
    * and number 4 again is an integer.  The ultimate invocation of exec() is
    * essential; if you forget this, nothing happens.
    *
-   * To see whether any prepared statement has been defined under a given name,
-   * use:
-   *
-   * @code
-   * T.prepared("mystatement").exists()
-   * @endcode
-   *
    * @warning Do not try to execute a prepared statement manually through direct
    * SQL statements.  This is likely not to work, and even if it does, is likely
    * to be slower than using the proper libpqxx functions.  Also, libpqxx knows
@@ -281,11 +221,8 @@ public:
    * deferred until its first use, which means that any errors in the prepared
    * statement may not show up until it is executed--and perhaps abort the
    * ongoing transaction in the process.
-   *
-   * If you leave out the statement name, the call refers to the nameless
-   * statement instead.
    */
-  prepare::invocation prepared(const PGSTD::string &statement=PGSTD::string());
+  prepare::invocation prepared(const PGSTD::string &statement);
 
   //@}
 
@@ -333,10 +270,9 @@ protected:
   /** The optional name, if nonempty, must begin with a letter and may contain
    * letters and digits only.
    *
-   * @param c The connection that this transaction is to act on.
-   * @param direct Running directly in connection context (i.e. not nested)?
+   * @param direct running directly in connection context (i.e. not nested)?
    */
-  explicit transaction_base(connection_base &c, bool direct=true);
+  explicit transaction_base(connection_base &, bool direct=true);
 
   /// Begin transaction (to be called by implementing class)
   /** Will typically be called from implementing class' constructor.
@@ -344,7 +280,7 @@ protected:
   void Begin();
 
   /// End transaction.  To be called by implementing class' destructor
-  void End() PQXX_NOEXCEPT;
+  void End() throw ();
 
   /// To be implemented by derived implementation class: start transaction
   virtual void do_begin() =0;
@@ -369,14 +305,8 @@ protected:
   result DirectExec(const char C[], int Retries=0);
 
   /// Forget about any reactivation-blocking resources we tried to allocate
-  void reactivation_avoidance_clear() PQXX_NOEXCEPT
+  void reactivation_avoidance_clear() throw ()
 	{m_reactivation_avoidance.clear();}
-
-protected:
-  /// Resources allocated in this transaction that make reactivation impossible
-  /** This number may be negative!
-   */
-  internal::reactivation_avoidance_counter m_reactivation_avoidance;
 
 private:
   /* A transaction goes through the following stages in its lifecycle:
@@ -412,28 +342,36 @@ private:
 
   void PQXX_PRIVATE CheckPendingError();
 
-  template<typename T> bool parm_is_null(T *p) const PQXX_NOEXCEPT
-	{ return !p; }
-  template<typename T> bool parm_is_null(T) const PQXX_NOEXCEPT
-	{ return false; }
+  template<typename T> bool parm_is_null(T *p) const throw () { return !p; }
+  template<typename T> bool parm_is_null(T) const throw () { return false; }
 
-  friend class pqxx::internal::gate::transaction_transactionfocus;
+  friend class pqxx::internal::sql_cursor;
+  void MakeEmpty(result &R) const { m_Conn.MakeEmpty(R); }
+
+  friend class internal::transactionfocus;
   void PQXX_PRIVATE RegisterFocus(internal::transactionfocus *);
-  void PQXX_PRIVATE UnregisterFocus(internal::transactionfocus *) PQXX_NOEXCEPT;
-  void PQXX_PRIVATE RegisterPendingError(const PGSTD::string &) PQXX_NOEXCEPT;
-
-  friend class pqxx::internal::gate::transaction_tablereader;
+  void PQXX_PRIVATE UnregisterFocus(internal::transactionfocus *) throw ();
+  void PQXX_PRIVATE RegisterPendingError(const PGSTD::string &) throw ();
+  friend class tablereader;
   void PQXX_PRIVATE BeginCopyRead(const PGSTD::string &, const PGSTD::string &);
-  bool ReadCopyLine(PGSTD::string &);
+  bool ReadCopyLine(PGSTD::string &L) { return m_Conn.ReadCopyLine(L); }
+  friend class tablewriter;
+  void PQXX_PRIVATE BeginCopyWrite(const PGSTD::string &Table,
+	const PGSTD::string &Columns = PGSTD::string());
+  void WriteCopyLine(const PGSTD::string &L) { m_Conn.WriteCopyLine(L); }
+  void EndCopyWrite() { m_Conn.EndCopyWrite(); }
 
-  friend class pqxx::internal::gate::transaction_tablewriter;
-  void PQXX_PRIVATE BeginCopyWrite(
-	const PGSTD::string &Table,
-	const PGSTD::string &Columns);
-  void WriteCopyLine(const PGSTD::string &);
-  void EndCopyWrite();
+  friend class pipeline;
+  void start_exec(const PGSTD::string &Q) { m_Conn.start_exec(Q); }
+  internal::pq::PGresult *get_result() { return m_Conn.get_result(); }
+  bool consume_input() throw () { return m_Conn.consume_input(); }
+  bool is_busy() const throw () { return m_Conn.is_busy(); }
 
-  friend class pqxx::internal::gate::transaction_subtransaction;
+  friend class prepare::invocation;
+  result prepared_exec(const PGSTD::string &,
+	const char *const[],
+	const int[],
+	int);
 
   connection_base &m_Conn;
 
@@ -442,6 +380,12 @@ private:
   bool m_Registered;
   PGSTD::map<PGSTD::string, PGSTD::string> m_Vars;
   PGSTD::string m_PendingError;
+
+  friend class subtransaction;
+  /// Resources allocated in this transaction that make reactivation impossible
+  /** This number may be negative!
+   */
+  internal::reactivation_avoidance_counter m_reactivation_avoidance;
 
   /// Not allowed
   transaction_base();

@@ -108,13 +108,9 @@ void Test(connection_base &C, bool ExplicitAbort)
 }
 
 
-void test_029(transaction_base &)
+void test_029(connection_base &, transaction_base &)
 {
   lazyconnection C;
-  {
-    nontransaction T(C);
-    test::create_pqxxevents(T);
-  }
 
   // Test abort semantics, both with explicit and implicit abort
   Test(C, true);

@@ -1,3 +1,5 @@
+#include <pqxx/compiler-internal.hxx>
+
 #include <iostream>
 #include <map>
 
@@ -22,7 +24,7 @@ void checkresult(pipeline &P, MAPIT c)
 }
 
 
-void test_071(transaction_base &W)
+void test_071(connection_base &, transaction_base &W)
 {
   pipeline P(W);
 

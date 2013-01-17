@@ -15,22 +15,11 @@ template<typename T> T make_infinity()
 #endif
 }
 
-void infinity_test(transaction_base &)
+void infinity_test(connection_base &, transaction_base &)
 {
   double inf = make_infinity<double>();
-  string inf_string;
-  double back_conversion;
-
-  inf_string = to_string(inf);
-  from_string(inf_string, back_conversion);
-  PQXX_CHECK_LESS(
-	999999999,
-	back_conversion,
-	"Infinity doesn't convert back to something huge.");
-
-  inf_string = to_string(-inf);
-  from_string(inf_string, back_conversion);
-  PQXX_CHECK_LESS(back_conversion, -999999999, "Negative infinity is broken");
+  PQXX_CHECK_EQUAL(to_string(inf), "infinity", "Infinity not as expected");
+  PQXX_CHECK_EQUAL(to_string(-inf), "-infinity", "Negative infinity is broken");
 }
 } // namespace
 

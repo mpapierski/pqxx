@@ -1,7 +1,7 @@
 #! /bin/bash
 # Release current libpqxx trunk (or other branch).
 #
-# Use this after a successful full test run in the parent series.
+# Use this after a successful preprelease run in the parent series.
 #
 # Arguments:
 #   <next version number> [parent]
@@ -34,7 +34,7 @@ DOC="/srv/www/devprojects/libpqxx/doc"
 
 CHECKOUT="`mktemp -p /tmp -d pqxx.XXXXXXXXXX`"
 echo "** Checking out source tree to $CHECKOUT **"
-cd -- "$CHECKOUT"
+cd "$CHECKOUT"
 svn co -q "$REPO"
 cd libpqxx/
 
@@ -61,6 +61,16 @@ echo "** Updating source tree **"
 svn cp "$PARENT" "tags/$PQXXVERSION"
 
 
+# Mark new trunk in debian/changelog.
+cat - <<EOF "tags/$PQXXVERSION"/debian/changelog >"$PARENT"/debian/changelog
+libpqxx ($NEXTVERSION-1) unstable; urgency=medium
+
+  * Forked release $PQXXVERSION.
+
+ -- Jeroen T. Vermeulen <jtv@xs4all.nl>  $RELEASEDATE
+
+EOF
+
 # Mark next version in NEWS.
 cat - <<EOF "tags/$PQXXVERSION/NEWS" >"$PARENT/NEWS"
 $NEXTVERSION
@@ -68,18 +78,21 @@ EOF
 
 echo "PQXX_VERSION	$NEXTVERSION" >"$PARENT"/VERSION
 
+svn commit -m "Forking release $PQXXVERSION, moving on to $NEXTVERSION."
 cd /tmp
+rm -rf -- "$CHECKOUT"
+
 
 echo "** Setting up new documentation **"
 TEMPDOC="`mktemp -p /tmp -d pqxxdoc.XXXXXXXXXX`"
-cd -- "$TEMPDOC"
+cd "$TEMPDOC"
 tar xzf "$SNAPSHOT"/libpqxx-*.tar.gz
 cd libpqxx-*/
 
 PREVIOUS=''
 for d in `ls "$DOC" | grep '[0-9]'`
 do
-	PREVIOUS="$PREVIOUS --link-dest='$DOC/$d'"
+	PREVIOUS="$PREVIOUS --link-dest='$d'"
 done
 
 rsync -r $PREVIOUS doc/html "$DOC/$PQXXVERSION"
@@ -94,10 +107,5 @@ then
 else
 	echo "*** Remember: Build tarball and make available for upload ***"
 fi
-
-cd -- "$CHECKOUT"
-svn commit -m "Forking release $PQXXVERSION, moving on to $NEXTVERSION."
-cd /tmp
-rm -rf -- "$CHECKOUT"
 
 echo "** Done **"

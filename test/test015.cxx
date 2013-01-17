@@ -35,12 +35,11 @@ public:
 };
 
 
-void test_015(transaction_base &orgT)
+void test_015(connection_base &C, transaction_base &ortT)
 {
-  connection_base &C(orgT.conn());
-  orgT.abort();
+  ortT.abort();
 
-  // See if deactivate() behaves...
+  // See if Deactivate() behaves...
   C.deactivate();
 
   C.perform(ReadTables());

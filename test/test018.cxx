@@ -54,7 +54,7 @@ class FailedInsert : public transactor<robusttransaction<serializable> >
   static string LastReason;
 public:
   FailedInsert(string Table) :
-    transactor<argument_type>("FailedInsert018"),
+    transactor<argument_type>("FailedInsert"),
     m_Table(Table)
   {
   }
@@ -67,7 +67,7 @@ public:
     throw deliberate_error();
   }
 
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     if (Reason != LastReason)
     {
@@ -82,16 +82,9 @@ public:
 string FailedInsert::LastReason;
 
 
-void test_018(transaction_base &T)
+void test_018(connection_base &C, transaction_base &T)
 {
-  connection_base &C(T.conn());
   T.abort();
-
-  {
-    work T2(C);
-    test::create_pqxxevents(T2);
-    T2.commit();
-  }
 
   const string Table = "pqxxevents";
 
@@ -105,7 +98,7 @@ void test_018(transaction_base &T)
   const FailedInsert DoomedTransaction(Table);
 
   {
-    quiet_errorhandler d(C);
+    disable_noticer d(C);
     PQXX_CHECK_THROWS(
 	C.perform(DoomedTransaction),
 	deliberate_error,

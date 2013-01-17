@@ -85,9 +85,8 @@ private:
 };
 
 
-void test_058(transaction_base &orgT)
+void test_058(connection_base &C, transaction_base &orgT)
 {
-  connection_base &C(orgT.conn());
   orgT.abort();
 
   C.perform(WriteLargeObject());

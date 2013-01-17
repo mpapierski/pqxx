@@ -35,9 +35,8 @@ public:
 };
 
 
-void test_034(transaction_base &T)
+void test_034(connection_base &C, transaction_base &T)
 {
-  connection_base &C(T.conn());
   T.abort();
 
   // See if deactivate() behaves...

@@ -4,26 +4,19 @@ libpqxx_la_SOURCES = binarystring.cxx \
 	connection.cxx \
 	cursor.cxx \
 	dbtransaction.cxx \
-	errorhandler.cxx \
 	except.cxx \
-	field.cxx \
 	largeobject.cxx \
 	nontransaction.cxx \
-	notification.cxx \
-	notify-listen.cxx \
 	pipeline.cxx \
 	prepared_statement.cxx \
 	result.cxx \
 	robusttransaction.cxx \
-	statement_parameters.cxx \
-	strconv.cxx \
 	subtransaction.cxx \
 	tablereader.cxx \
 	tablestream.cxx \
 	tablewriter.cxx \
 	transaction.cxx \
 	transaction_base.cxx \
-	tuple.cxx \
 	util.cxx
 
 libpqxx_version = -release $(PQXX_ABI)
@@ -38,3 +31,4 @@ INCLUDES=-I$(top_srcdir)/include -I$(top_builddir)/include ${POSTGRES_INCLUDE}
 DEFAULT_INCLUDES=
 
 MAINTAINERCLEANFILES=Makefile.in
+

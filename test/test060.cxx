@@ -1,3 +1,5 @@
+#include <pqxx/compiler-internal.hxx>
+
 #include <iostream>
 
 #include "test_helpers.hxx"
@@ -52,9 +54,8 @@ void ActivationTest(connection_base &C, string style, string expected)
 }
 
 
-void test_060(transaction_base &orgT)
+void test_060(connection_base &C, transaction_base &orgT)
 {
-  connection_base &C(orgT.conn());
   orgT.abort();
 
   PQXX_CHECK(!GetDatestyle(C).empty(), "Initial datestyle not set.");
@@ -70,7 +71,7 @@ void test_060(transaction_base &orgT)
   ActivationTest(C, "SQL", SQLname);
 
   // Prove that setting an unknown variable causes an error, as expected
-  quiet_errorhandler d(C);
+  disable_noticer d(C);
   PQXX_CHECK_THROWS(
 	C.set_variable("NONEXISTENT_VARIABLE_I_HOPE", "1"),
 	sql_error,

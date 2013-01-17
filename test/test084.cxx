@@ -15,7 +15,7 @@ using namespace pqxx;
 // Compare results against an icursor_iterator so that is tested as well.
 namespace
 {
-void test_084(transaction_base &T)
+void test_084(connection_base &, transaction_base &T)
 {
   const string Table = "pg_tables", Key = "tablename";
 

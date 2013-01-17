@@ -12,7 +12,7 @@ using namespace pqxx;
 // connection.
 namespace
 {
-void test_030(transaction_base &)
+void test_030(connection_base &, transaction_base &)
 {
   const string Table = "pg_tables";
 
@@ -23,7 +23,7 @@ void test_030(transaction_base &)
   PQXX_CHECK(!R.empty(), "Table " + Table + " is empty, cannot test.");
 
   // Print column names
-  for (pqxx::tuple::size_type c = 0; c < R.columns(); ++c)
+  for (result::tuple::size_type c = 0; c < R.columns(); ++c)
   {
     string N= R.column_name(c);
     cout << c << ":\t" << N << endl;
@@ -53,7 +53,7 @@ void test_030(transaction_base &)
   else
     PQXX_CHECK_EQUAL(R[1].rownumber(), 1u, "Row 1 reports wrong number.");
 
-  for (pqxx::tuple::size_type c = 0; c < R[0].size(); ++c)
+  for (result::tuple::size_type c = 0; c < R[0].size(); ++c)
   {
     string N = R.column_name(c);
 

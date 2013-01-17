@@ -77,7 +77,7 @@ public:
   }
 
   // Postprocessing code for aborted execution attempt
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     try
     {
@@ -96,14 +96,9 @@ private:
 };
 
 
-void test_026(transaction_base &)
+void test_026(connection_base &, transaction_base &)
 {
   lazyconnection C;
-  {
-    nontransaction T(C);
-    test::create_pqxxevents(T);
-    T.commit();
-  }
 
   // Perform (an instantiation of) the UpdateYears transactor we've defined
   // in the code above.  This is where the work gets done.
