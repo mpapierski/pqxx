@@ -90,8 +90,7 @@ public:
       PQXX_CHECK_EQUAL(
 	tctype,
 	rctype,
-	"pqxx::tuple::column_type() is inconsistent with "
-		"result::column_type().");
+	"tuple::column_type() is inconsistent with result::column_type().");
 
       const oid ctctype = r->column_type(rcol);
 
@@ -144,7 +143,7 @@ public:
   }
 
   // Postprocessing code for aborted execution attempt
-  void on_abort(const char Reason[]) PQXX_NOEXCEPT
+  void on_abort(const char Reason[]) throw ()
   {
     try
     {

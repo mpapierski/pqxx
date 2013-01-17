@@ -16,10 +16,21 @@ EOF
 }
 
 
+# This version must be at the top of the Debian changelog.
+check_debian_changelog() {
+	if ! head -n1 debian/changelog | grep -q "^libpqxx ($PQXXVERSION\\>"
+	then
+		cat <<EOF >&2
+Version $PQXXVERSION is not at the top of debian/changelog.
+EOF
+		exit 1
+	fi
+}
+
+
 # Count number of times header $1 is included from each of given input files.
 # Output is lines of <filename>:<count>, one line per file, sorted.
 count_includes() {
-	local HEADER_NAME WS PAT
 	HEADER_NAME="$1"
 	shift
 	WS="[[:space:]]*"
@@ -31,7 +42,6 @@ count_includes() {
 # Any file that includes compiler-internal-pre.hxx must also include
 # compiler-internal-post.hxx, and vice versa.
 check_compiler_internal_headers() {
-	local TEMPDIR PRE POST
 	TEMPDIR="`mktemp --tmpdir -d pqxx-pre-release-check.XXXX`"
 	if test -z "$TEMPDIR"
 	then
@@ -59,4 +69,5 @@ EOF
 
 
 check_news_version
+check_debian_changelog
 check_compiler_internal_headers

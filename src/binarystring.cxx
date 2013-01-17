@@ -174,7 +174,7 @@ pqxx::binarystring::binarystring(const void *binary_data, size_t len) :
 }
 
 
-bool pqxx::binarystring::operator==(const binarystring &rhs) const PQXX_NOEXCEPT
+bool pqxx::binarystring::operator==(const binarystring &rhs) const throw ()
 {
   if (rhs.size() != size()) return false;
   for (size_type i=0; i<size(); ++i) if (rhs[i] != data()[i]) return false;

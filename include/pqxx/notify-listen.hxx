@@ -8,7 +8,7 @@
  *   Predecessor to notification_receiver.  Deprecated.  Do not use.
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/notify-listen instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -55,19 +55,19 @@ private:
 /// Obsolete notification receiver.
 /** @deprecated Use notification_receiver instead.
  */
-class PQXX_LIBEXPORT PQXX_NOVTABLE PQXX_DEPRECATED notify_listener :
+class PQXX_LIBEXPORT PQXX_NOVTABLE notify_listener :
   public PGSTD::unary_function<int, void>
 {
 public:
   notify_listener(connection_base &c, const PGSTD::string &n);
-  virtual ~notify_listener() PQXX_NOEXCEPT;
+  virtual ~notify_listener() throw ();
   const PGSTD::string &name() const { return m_forwarder.channel(); }
   virtual void operator()(int be_pid) =0;
 
 
 protected:
-  connection_base &Conn() const PQXX_NOEXCEPT { return conn(); }
-  connection_base &conn() const PQXX_NOEXCEPT { return m_conn; }
+  connection_base &Conn() const throw () { return conn(); }
+  connection_base &conn() const throw () { return m_conn; }
 
 private:
   connection_base &m_conn;

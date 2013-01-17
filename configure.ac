@@ -11,15 +11,15 @@
 LC_ALL=C
 
 AC_PREREQ(2.59)
-AC_INIT(libpqxx, 5.0, [Jeroen T. Vermeulen <jtv@xs4all.nl>])
+AC_INIT(libpqxx, 4.0.1, [Jeroen T. Vermeulen <jtv@xs4all.nl>])
 AC_LANG(C++)
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([config/m4])
-AM_INIT_AUTOMAKE(libpqxx, 5.0)
+AM_INIT_AUTOMAKE(libpqxx, 4.0.1)
 
-PQXXVERSION=5.0
-PQXX_ABI=5.0
-PQXX_MAJOR=5
+PQXXVERSION=4.0.1
+PQXX_ABI=4.0
+PQXX_MAJOR=4
 PQXX_MINOR=0
 AC_SUBST(PQXXVERSION)
 AC_SUBST(PQXX_ABI)
@@ -243,18 +243,6 @@ else
 fi
 
 
-AC_MSG_CHECKING([for noexcept support])
-noexcept_keyword=yes
-AC_TRY_COMPILE(
-	[void foo() noexcept {}],
-	[],
-	AC_DEFINE(
-		[PQXX_HAVE_NOEXCEPT],
-		1,
-		[Define if the compiler supports the noexcept keyword.]),
-	noexcept_keyword=no)
-AC_MSG_RESULT($noexcept_keyword)
-
 boost_smart_ptr=yes
 AC_CHECK_HEADER(boost/smart_ptr.hpp, AC_DEFINE(PQXX_HAVE_BOOST_SMART_PTR, 1,
 	[Define if you have the <boost/smart_ptr.hpp> header]),
@@ -383,8 +371,8 @@ AC_HEADER_STDC
 
 AC_MSG_CHECKING([ability to compile programs using the standard C library])
 AC_TRY_COMPILE([#include <string.h>
-	namespace std {} // In case string.h does not define it.
 	${usestd}
+	namespace std {} // In case string.h does not define it.
 	extern void f(size_t);],
 	[f(strlen(""))],[],
 	[AC_MSG_ERROR([
@@ -471,7 +459,7 @@ A source file using the PQexec() function did compile without problems, and the
 libpq library is available for linking, but for some reason a call to PQexec()
 failed to link properly to the libpq library.  This may be because the libpq
 library file is damaged, or in some incorrect format. or if your libpq is much
-more recent than libpqxx version 5.0, perhaps libpq has undergone a
+more recent than libpqxx version 4.0.1, perhaps libpq has undergone a
 radical ABI change.
 
 The last parts of config.log may give you a clue as to what really went wrong,
@@ -1027,9 +1015,10 @@ AC_MSG_RESULT($usingdecl)
 
 AC_PROG_MAKE_SET
 
-AC_CONFIG_FILES([Makefile config/Makefile doc/Makefile
+AC_CONFIG_FILES([Makefile config/Makefile debian/Makefile doc/Makefile
 doc/Doxyfile src/Makefile test/Makefile test/unit/Makefile tools/Makefile
-win32/Makefile include/Makefile include/pqxx/Makefile libpqxx.pc pqxx-config])
+win32/Makefile include/Makefile include/pqxx/Makefile libpqxx.pc pqxx-config
+libpqxx.spec])
 
 
 AC_CONFIG_COMMANDS([configitems], ["${srcdir}/tools/splitconfig" "${srcdir}"])

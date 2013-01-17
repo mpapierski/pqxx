@@ -8,7 +8,7 @@
  *   pqxx::result represents the set of result tuples from a database query
  *   DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/tuple instead.
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -62,48 +62,48 @@ public:
   typedef const_reverse_iterator reverse_iterator;
 
   /// @deprecated Do not use this constructor.  It will become private.
-  tuple(const result *r, size_t i) PQXX_NOEXCEPT;
+  tuple(const result *r, size_t i) throw ();
 
-  ~tuple() PQXX_NOEXCEPT {} // Yes Scott Meyers, you're absolutely right[1]
+  ~tuple() throw () {} // Yes Scott Meyers, you're absolutely right[1]
 
   /**
    * @name Comparison
    */
   //@{
-  bool PQXX_PURE operator==(const tuple &) const PQXX_NOEXCEPT;		//[t75]
-  bool operator!=(const tuple &rhs) const PQXX_NOEXCEPT			//[t75]
+  bool PQXX_PURE operator==(const tuple &) const throw ();		//[t75]
+  bool operator!=(const tuple &rhs) const throw ()			//[t75]
       { return !operator==(rhs); }
   //@}
 
-  const_iterator begin() const PQXX_NOEXCEPT;				//[t82]
-  const_iterator end() const PQXX_NOEXCEPT;				//[t82]
+  const_iterator begin() const throw ();				//[t82]
+  const_iterator end() const throw ();					//[t82]
 
   /**
    * @name Field access
    */
   //@{
-  reference front() const PQXX_NOEXCEPT;				//[t74]
-  reference back() const PQXX_NOEXCEPT;					//[t75]
+  reference front() const throw ();					//[t74]
+  reference back() const throw ();					//[t75]
 
   const_reverse_tuple_iterator rbegin() const;				//[t82]
   const_reverse_tuple_iterator rend() const;				//[t82]
 
-  reference operator[](size_type) const PQXX_NOEXCEPT;			//[t11]
-  reference operator[](int) const PQXX_NOEXCEPT;			//[t2]
+  reference operator[](size_type) const throw ();			//[t11]
+  reference operator[](int) const throw ();				//[t2]
   reference operator[](const char[]) const;				//[t11]
   reference operator[](const PGSTD::string &) const;			//[t11]
-  reference at(size_type) const; 					//[t11]
-  reference at(int) const;						//[t11]
+  reference at(size_type) const throw (pqxx::range_error);			//[t11]
+  reference at(int) const throw (pqxx::range_error);				//[t11]
   reference at(const char[]) const;					//[t11]
   reference at(const PGSTD::string &) const;				//[t11]
   //@}
 
-  size_type size() const PQXX_NOEXCEPT					//[t11]
+  size_type size() const throw ()					//[t11]
 						     { return m_End-m_Begin; }
 
-  void swap(tuple &) PQXX_NOEXCEPT;					//[t11]
+  void swap(tuple &) throw ();						//[t11]
 
-  size_t rownumber() const PQXX_NOEXCEPT { return m_Index; }			//[t11]
+  size_t rownumber() const throw () { return m_Index; }			//[t11]
 
   /**
    * @name Column information
@@ -180,7 +180,7 @@ public:
   tuple slice(size_type Begin, size_type End) const;
 
   // Is this an empty slice?
-  bool PQXX_PURE empty() const PQXX_NOEXCEPT;
+  bool PQXX_PURE empty() const throw ();
 
 protected:
   friend class field;
@@ -211,10 +211,9 @@ public:
   typedef tuple::difference_type difference_type;
   typedef field reference;
 
-  const_tuple_iterator(const tuple &T, tuple::size_type C)		//[t82]
-	PQXX_NOEXCEPT :
+  const_tuple_iterator(const tuple &T, tuple::size_type C) throw () :	//[t82]
     field(T, C) {}
-  const_tuple_iterator(const field &F) PQXX_NOEXCEPT : field(F) {}	//[t82]
+  const_tuple_iterator(const field &F) throw () : field(F) {}		//[t82]
 
   /**
    * @name Dereferencing operators
@@ -294,10 +293,10 @@ public:
   const_reverse_tuple_iterator(const const_reverse_tuple_iterator &r) :	//[t82]
     const_tuple_iterator(r) {}
   explicit
-    const_reverse_tuple_iterator(const super &rhs) PQXX_NOEXCEPT :	//[t82]
+    const_reverse_tuple_iterator(const super &rhs) throw() :		//[t82]
       const_tuple_iterator(rhs) { super::operator--(); }
 
-  iterator_type PQXX_PURE base() const PQXX_NOEXCEPT;			//[t82]
+  iterator_type PQXX_PURE base() const throw ();			//[t82]
 
   /**
    * @name Dereferencing operators
@@ -343,11 +342,11 @@ public:
    * @name Comparisons
    */
   //@{
-  bool operator==(const const_reverse_tuple_iterator &rhs)		//[t82]
-	const PQXX_NOEXCEPT
+  bool
+    operator==(const const_reverse_tuple_iterator &rhs) const throw ()	//[t82]
       { return iterator_type::operator==(rhs); }
-  bool operator!=(const const_reverse_tuple_iterator &rhs)		//[t82]
-	const PQXX_NOEXCEPT
+  bool
+    operator!=(const const_reverse_tuple_iterator &rhs) const throw ()	//[t82]
       { return !operator==(rhs); }
 
   bool operator<(const const_reverse_tuple_iterator &rhs) const		//[t82]

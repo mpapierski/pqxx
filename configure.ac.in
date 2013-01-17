@@ -243,18 +243,6 @@ else
 fi
 
 
-AC_MSG_CHECKING([for noexcept support])
-noexcept_keyword=yes
-AC_TRY_COMPILE(
-	[void foo() noexcept {}],
-	[],
-	AC_DEFINE(
-		[PQXX_HAVE_NOEXCEPT],
-		1,
-		[Define if the compiler supports the noexcept keyword.]),
-	noexcept_keyword=no)
-AC_MSG_RESULT($noexcept_keyword)
-
 boost_smart_ptr=yes
 AC_CHECK_HEADER(boost/smart_ptr.hpp, AC_DEFINE(PQXX_HAVE_BOOST_SMART_PTR, 1,
 	[Define if you have the <boost/smart_ptr.hpp> header]),
@@ -383,8 +371,8 @@ AC_HEADER_STDC
 
 AC_MSG_CHECKING([ability to compile programs using the standard C library])
 AC_TRY_COMPILE([#include <string.h>
-	namespace std {} // In case string.h does not define it.
 	${usestd}
+	namespace std {} // In case string.h does not define it.
 	extern void f(size_t);],
 	[f(strlen(""))],[],
 	[AC_MSG_ERROR([
@@ -1027,9 +1015,10 @@ AC_MSG_RESULT($usingdecl)
 
 AC_PROG_MAKE_SET
 
-AC_CONFIG_FILES([Makefile config/Makefile doc/Makefile
+AC_CONFIG_FILES([Makefile config/Makefile debian/Makefile doc/Makefile
 doc/Doxyfile src/Makefile test/Makefile test/unit/Makefile tools/Makefile
-win32/Makefile include/Makefile include/pqxx/Makefile libpqxx.pc pqxx-config])
+win32/Makefile include/Makefile include/pqxx/Makefile libpqxx.pc pqxx-config
+libpqxx.spec])
 
 
 AC_CONFIG_COMMANDS([configitems], ["${srcdir}/tools/splitconfig" "${srcdir}"])

@@ -19,75 +19,25 @@
  - Fixes #261.
 2013-01-12  Jeroen T. Vermeulen <jtv@xs4all.nl>
  src/strconv.cxx, test/unit/test_string_conversion.cxx:
- - Some integer overflows in from_string were not detected.
- - Fixes #263.
+ - Backport fix for #263.
 2013-01-10  Jeroen T. Vermeulen <jtv@xs4all.nl>
  configure.ac.in:
  - Fix w clang++ 3.0: basic C-library test broke.
 2012-08-03  Jeroen T. Vermeulen <jtv@xs4all.nl>
- src/strconv.cxx:
- - Compile fix for clang++ 3.2.  Thanks Amy Troschinetz.
- - Fixes #253.
-2012-08-03  Jeroen T. Vermeulen <jtv@xs4all.nl>
  include/pqxx/largeobject.hxx:
- - Compile fix for clang++ 3.2.  Thanks Amy Troschinetz.
- - Fixes #252.
-2012-04-25  Jeroen T. Vermeulen <jtv@xs4all.nl>
- configure.ac.in, debian, Makefile.am, tools/lint, tools/release:
- - Removed obsolete debian and RPM packaging.
- - No longer check, or update, debian/changelog for releases.
- - Dropped debian directory altogether.
-2012-04-04  Jeroen T. Vermeulen <jtv@xs4all.nl>
- tools/lint, tools/pqxx-fulltest, tools/pre-release-check, tools/splitconfig:
- - Mark local variables in shell functions with "local."
-2012-03-25  Jeroen T. Vermeulen <jtv@xs4all.nl>
- include/pqxx/basic_connection.hxx, include/pqxx/binarystring.hxx,
- include/pqxx/connection_base.hxx, include/pqxx/connection.hxx,
- include/pqxx/connectionpolicy.hxx, include/pqxx/cursor.hxx,
- include/pqxx/errorhandler.hxx, include/pqxx/except.hxx,
- include/pqxx/field.hxx, include/pqxx/internal/callgate.hxx,
- include/pqxx/internal/gates/connection-dbtransaction.hxx,
- include/pqxx/internal/gates/connection-notification_receiver.hxx,
- include/pqxx/internal/gates/connection-pipeline.hxx,
- include/pqxx/internal/gates/connection-transaction.hxx,
- include/pqxx/internal/gates/errorhandler-connection.hxx,
- include/pqxx/internal/gates/icursor_iterator-icursorstream.hxx,
- include/pqxx/internal/gates/icursorstream-icursor_iterator.hxx,
- include/pqxx/internal/gates/result-sql_cursor.hxx,
- include/pqxx/internal/gates/transaction-transactionfocus.hxx,
- include/pqxx/internal/result_data.hxx, include/pqxx/isolation.hxx,
- include/pqxx/largeobject.hxx, include/pqxx/notification.hxx,
- include/pqxx/notify-listen.hxx, include/pqxx/pipeline.hxx,
- include/pqxx/result.hxx, include/pqxx/robusttransaction.hxx,
- include/pqxx/strconv.hxx, include/pqxx/tablereader.hxx,
- include/pqxx/tablestream.hxx, include/pqxx/tablewriter.hxx,
- include/pqxx/transaction_base.hxx, include/pqxx/transaction.hxx,
- include/pqxx/transactor.hxx, include/pqxx/tuple.hxx, include/pqxx/util.hxx,
- src/binarystring.cxx, src/connection_base.cxx, src/connection.cxx,
- src/cursor.cxx, src/errorhandler.cxx, src/except.cxx, src/field.cxx,
- src/largeobject.cxx, src/notify-listen.cxx, src/pipeline.cxx, src/result.cxx,
- src/robusttransaction.cxx, src/strconv.cxx, src/tablereader.cxx,
- src/tablestream.cxx, src/tablewriter.cxx, src/transaction_base.cxx,
- src/tuple.cxx, src/util.cxx, test/test000.cxx, test/test007.cxx,
- test/test013.cxx, test/test018.cxx, test/test023.cxx, test/test026.cxx,
- test/test032.cxx, test/test037.cxx, test/test078.cxx, test/test079.cxx,
- test/test087.cxx, test/test094.cxx, test/test_helpers.hxx,
- test/test_main.hxx, test/unit/test_errorhandler.cxx:
- - Use noexcept instead of throw () if available (depending on compiler).
+ - Backported fix for #252: clang++ 3.2 compile error.  Thanks Amy Troschinetz.
+ src/strconv.cxx:
+ - Backported fix for #253: clang++ 3.2 compile error.  Thanks Amy Troschinetz.
 2012-03-25  Jeroen T. Vermeulen <jtv@xs4all.nl>
  test/test002.cxx, test/test007.cxx, test/test011.cxx, test/test012.cxx,
  test/test016.cxx, test/test030.cxx, test/test031.cxx, test/test049.cxx,
  test/test067.cxx, test/test082.cxx, test/test093.cxx:
- - C++11 fixes.  Not quite there yet; NAN handling seems to have changed.
-2012-03-24  Jeroen T. Vermeulen <jtv@xs4all.nl>
- configure.ac.in:
- - Check for noexcept support.
- include/pqxx/compiler-public.hxx:
- - Set PQXX_NOEXCEPT as compatible alias for noexcept (or empty throw spec).
-2012-03-24  Jeroen T. Vermeulen <jtv@xs4all.nl>
- include/pqxx/pipeline.hxx, include/pqxx/result.hxx, include/pqxx/tuple.hxx,
- include/pqxx/util.hxx, src/pipeline.cxx, src/result.cxx, src/tuple.cxx:
- - Dynamic throw specs are deprecated.  Ditch the non-empty ones first.
+ - C++11 fixes.
+2012-03-10  Jeroen T. Vermeulen <jtv@xs4all.nl>
+ include/pqxx/result.hxx:
+ - Compatibility typedefs: pqxx::result::tuple and pqxx::result::field.
+ - Not going into trunk, only in the 4.0 series.
+ - Thanks Maxime van Noppen.
 2012-03-10  Jeroen T. Vermeulen <jtv@xs4all.nl>
  include/pqxx/prepared_statement.hxx:
  - Updated docs for prepared-statement parameters: no longer need declarations.
@@ -104,11 +54,10 @@
  - Test was brittle w.r.t. result ordering.  Rewrote it.
  - Thanks Jean Marie de Montarby (did I spell that right?) for the report.
 2012-01-18  Jeroen T. Vermeulen <jtv@xs4all.nl>
- include/pqxx/binarystring.hxx, include/pqxx/notify-listen.hxx,
  test/test004.cxx, test/test023.cxx, test/test078.cxx, test/test079.cxx,
  test/test087.cxx:
- - Deprecate notify_listener.
- - Deprecate binarystring (connection-unaware) escaping functions.
+ - Stop using deprecated notify_listener.
+ - Stop using deprecated connection-unaware escaping functions.
 2011-12-03  Jeroen T. Vermeulen <jtv@xs4all.nl>
  include/pqxx/tuple.hxx:
  - Forward-declare pqxx::range_error.

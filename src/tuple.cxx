@@ -7,7 +7,7 @@
  *      implementation of the pqxx::result class and support classes.
  *   pqxx::result represents the set of result tuples from a database query
  *
- * Copyright (c) 2001-2012, Jeroen T. Vermeulen <jtv@xs4all.nl>
+ * Copyright (c) 2001-2011, Jeroen T. Vermeulen <jtv@xs4all.nl>
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -29,7 +29,7 @@
 using namespace PGSTD;
 
 
-pqxx::tuple::tuple(const result *r, size_t i) PQXX_NOEXCEPT :
+pqxx::tuple::tuple(const result *r, size_t i) throw () :
   m_Home(r),
   m_Index(i),
   m_Begin(0),
@@ -38,25 +38,25 @@ pqxx::tuple::tuple(const result *r, size_t i) PQXX_NOEXCEPT :
 }
 
 
-pqxx::tuple::const_iterator pqxx::tuple::begin() const PQXX_NOEXCEPT
+pqxx::tuple::const_iterator pqxx::tuple::begin() const throw ()
 {
   return const_iterator(*this, m_Begin);
 }
 
 
-pqxx::tuple::const_iterator pqxx::tuple::end() const PQXX_NOEXCEPT
+pqxx::tuple::const_iterator pqxx::tuple::end() const throw ()
 {
   return const_iterator(*this, m_End);
 }
 
 
-pqxx::tuple::reference pqxx::tuple::front() const PQXX_NOEXCEPT
+pqxx::tuple::reference pqxx::tuple::front() const throw ()
 {
   return field(*this, m_Begin);
 }
 
 
-pqxx::tuple::reference pqxx::tuple::back() const PQXX_NOEXCEPT
+pqxx::tuple::reference pqxx::tuple::back() const throw ()
 {
   return field(*this, m_End - 1);
 }
@@ -74,7 +74,7 @@ pqxx::tuple::const_reverse_iterator pqxx::tuple::rend() const
 }
 
 
-bool pqxx::tuple::operator==(const tuple &rhs) const PQXX_NOEXCEPT
+bool pqxx::tuple::operator==(const tuple &rhs) const throw ()
 {
   if (&rhs == this) return true;
   const size_type s(size());
@@ -85,13 +85,13 @@ bool pqxx::tuple::operator==(const tuple &rhs) const PQXX_NOEXCEPT
 }
 
 
-pqxx::tuple::reference pqxx::tuple::operator[](size_type i) const PQXX_NOEXCEPT
+pqxx::tuple::reference pqxx::tuple::operator[](size_type i) const throw ()
 {
   return field(*this, m_Begin + i);
 }
 
 
-pqxx::tuple::reference pqxx::tuple::operator[](int i) const PQXX_NOEXCEPT
+pqxx::tuple::reference pqxx::tuple::operator[](int i) const throw ()
 {
   return operator[](size_type(i));
 }
@@ -109,7 +109,7 @@ pqxx::tuple::reference pqxx::tuple::operator[](const string &s) const
 }
 
 
-pqxx::tuple::reference pqxx::tuple::at(int i) const
+pqxx::tuple::reference pqxx::tuple::at(int i) const throw (range_error)
 {
   return at(size_type(i));
 }
@@ -121,7 +121,7 @@ pqxx::tuple::reference pqxx::tuple::at(const string &s) const
 }
 
 
-void pqxx::tuple::swap(tuple &rhs) PQXX_NOEXCEPT
+void pqxx::tuple::swap(tuple &rhs) throw ()
 {
   const result *const h(m_Home);
   const result::size_type i(m_Index);
@@ -145,6 +145,7 @@ pqxx::field pqxx::tuple::at(const char f[]) const
 
 
 pqxx::field pqxx::tuple::at(pqxx::tuple::size_type i) const
+  throw (range_error)
 {
   if (i >= size())
     throw range_error("Invalid field number");
@@ -211,7 +212,7 @@ pqxx::tuple pqxx::tuple::slice(size_type Begin, size_type End) const
 }
 
 
-bool pqxx::tuple::empty() const PQXX_NOEXCEPT
+bool pqxx::tuple::empty() const throw ()
 {
   return m_Begin == m_End;
 }
@@ -234,7 +235,7 @@ pqxx::const_tuple_iterator pqxx::const_tuple_iterator::operator--(int)
 
 
 pqxx::const_tuple_iterator
-pqxx::const_reverse_tuple_iterator::base() const PQXX_NOEXCEPT
+pqxx::const_reverse_tuple_iterator::base() const throw ()
 {
   iterator_type tmp(*this);
   return ++tmp;

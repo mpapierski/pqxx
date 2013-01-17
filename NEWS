@@ -1,12 +1,12 @@
-5.0
+4.0.1
  - Support for REPEATABLE READ isolation level.
  - Build fix for OS X.
  - Build fixes for clang++ 3.2.
- - Build fix for clang++ 3.0.
+ - Build fixes for clang++ 3.0.
  - Build fix for MinGW.
  - Build fix for BSD (and possibly other grep flavours).
+ - Compatibility typedefs: pqxx::result::tuple & pqxx::result::field.
  - Supports C++11.
- - No longer has obsolete debian & RPM packaging built in.
  - Fixed failure to detect some integer overflows during conversion.
 4.0
  - API change: noticers are gone!  Use errorhandlers to capture error output.

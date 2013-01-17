@@ -84,7 +84,7 @@ void test_082(transaction_base &T)
     cout <<endl;
   }
 
-  // Thorough test for tuple::const_reverse_iterator
+  // Thorough test for pqxx::tuple::const_reverse_iterator
   pqxx::tuple::const_reverse_iterator
     ri1(R.front().rbegin()), ri2(ri1), ri3(R.front().end());
   ri2 = R.front().rbegin();
