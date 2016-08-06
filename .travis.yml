@@ -1,0 +1,20 @@
+language: cpp
+sudo: required
+compiler:
+  - gcc
+  - clang
+os:
+  - linux
+  - osx
+services:
+  - postgres
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libpq-dev postgresql-server-dev-all doxygen
+before_script:
+  - psql -c 'create database travis_ci_test;' -U postgres
+script:
+  - ./configure
+  - make
+  - make PGDATABASE=travis_ci_test check
+  - sudo make install
