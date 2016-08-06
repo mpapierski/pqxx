@@ -9,7 +9,7 @@ services:
   - postgres
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y libpq-dev postgresql-server-dev-all doxygen
+  - sudo apt-get install -y libpq-dev postgresql-server-dev-all doxygen xmlto
 before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
 script:
